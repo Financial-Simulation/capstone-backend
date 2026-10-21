@@ -83,3 +83,6 @@ Content-Type: application/json
     }
   }
 }
+
+### 7. 예시 사용자 S1~S3
+GET {{host}}/api/examples

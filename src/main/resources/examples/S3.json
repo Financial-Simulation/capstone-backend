@@ -1,0 +1,18 @@
+{
+  "startMonth": "2026-11",
+  "person": { "age": 36, "careerYears": 8, "employmentType": "CONTRACT" },
+  "income": { "monthlyNetIncome": 3200000 },
+  "expenses": {
+    "fixed": { "inputMode": "TOTAL", "items": [], "total": 1100000 },
+    "variable": { "inputMode": "TOTAL", "items": [], "total": 1000000 }
+  },
+  "assets": { "cash": 15000000, "deposits": 0, "investments": 0 },
+  "savingPlan": { "monthlySaving": 600000, "generalSavingRate": 3.03, "monthlyInvestment": 0, "emergencyFirstAmount": 0 },
+  "emergency": { "breakThreshold": 1000000 },
+  "loans": { "hasNoLoan": true, "items": [] },
+  "goal": { "name": "5년 뒤 5,000만 원", "targetAmount": 50000000, "targetDate": "2031-11" },
+  "events": [
+    { "presetKey": "JEONSE_MOVE", "name": "전세 이사", "eventType": "MOVE", "occurDate": "2027-11",
+      "deposit": 10000000, "monthlyChange": -300000, "amount": 1500000 }
+  ]
+}

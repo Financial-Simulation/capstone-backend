@@ -1,0 +1,17 @@
+{
+  "startMonth": "2026-11",
+  "person": { "age": 27, "careerYears": 2, "employmentType": "REGULAR" },
+  "income": { "monthlyNetIncome": 2500000 },
+  "expenses": {
+    "fixed": { "inputMode": "TOTAL", "items": [], "total": 950000 },
+    "variable": { "inputMode": "TOTAL", "items": [], "total": 950000 }
+  },
+  "assets": { "cash": 2000000, "deposits": 0, "investments": 0 },
+  "savingPlan": { "monthlySaving": 500000, "generalSavingRate": 3.03, "monthlyInvestment": 0, "emergencyFirstAmount": 0 },
+  "emergency": { "breakThreshold": 500000 },
+  "loans": { "hasNoLoan": false, "items": [
+    { "name": "학자금대출", "loanType": "STUDENT", "principal": 12000000,
+      "annualRate": 1.9, "remainingMonths": 96, "repaymentType": "EQUAL_PAYMENT" } ] },
+  "goal": { "name": "5년 뒤 3,000만 원", "targetAmount": 30000000, "targetDate": "2031-11" },
+  "events": []
+}
