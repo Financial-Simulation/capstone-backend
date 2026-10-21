@@ -38,3 +38,5 @@ out/
 
 ### Mac ###
 .DS_Store
+### 개인 Java 경로 ###
+gradle.properties
