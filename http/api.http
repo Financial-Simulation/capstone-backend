@@ -1,0 +1,68 @@
+### VSCode 확장 'REST Client'를 깔면 각 요청 위에 'Send Request'가 생긴다.
+### 서버를 먼저 켜 두고 누르면 오른쪽에 응답이 뜬다.
+
+@host = http://localhost:8080
+
+### 1. 입력 검사 - S1 예시, 01-2 화면 (경고 1개가 나와야 함)
+POST {{host}}/api/inputs/validate
+Content-Type: application/json
+
+{
+  "step": "ASSETS",
+  "input": {
+    "startMonth": "2026-11",
+    "person": { "age": 27, "careerYears": 2, "employmentType": "REGULAR" },
+    "income": { "monthlyNetIncome": 2500000 },
+    "expenses": {
+      "fixed": { "inputMode": "TOTAL", "items": [], "total": 950000 },
+      "variable": { "inputMode": "TOTAL", "items": [], "total": 950000 }
+    },
+    "assets": { "cash": 2000000, "deposits": 0, "investments": 0 },
+    "savingPlan": { "monthlySaving": 500000, "generalSavingRate": 3.03, "monthlyInvestment": 0, "emergencyFirstAmount": 0 },
+    "emergency": { "breakThreshold": 500000 },
+    "loans": { "hasNoLoan": false, "items": [
+      { "name": "학자금대출", "loanType": "STUDENT", "principal": 12000000,
+        "annualRate": 1.9, "remainingMonths": 96, "repaymentType": "EQUAL_PAYMENT" } ] },
+    "goal": { "name": "5년 뒤 3,000만 원", "targetAmount": 30000000, "targetDate": "2031-11" },
+    "events": []
+  }
+}
+
+### 2. 입력 검사 - 나이 17살 (COMMON400 + "person.age" 메시지)
+POST {{host}}/api/inputs/validate
+Content-Type: application/json
+
+{
+  "step": "BASIC",
+  "input": {
+    "startMonth": "2026-11",
+    "person": { "age": 17, "careerYears": 0 },
+    "income": { "monthlyNetIncome": 2500000 },
+    "expenses": {
+      "fixed": { "inputMode": "TOTAL", "total": 950000 },
+      "variable": { "inputMode": "TOTAL", "total": 950000 }
+    }
+  }
+}
+
+### 3. 대출 월 상환액 미리보기 (134,839원)
+POST {{host}}/api/loans/repayment-preview
+Content-Type: application/json
+
+{
+  "loanType": "STUDENT",
+  "principal": 12000000,
+  "annualRate": 1.9,
+  "remainingMonths": 96,
+  "repaymentType": "EQUAL_PAYMENT"
+}
+
+### 4. 전세대출, 금리·상환 방식 비움 → 기본값 4.3%, 이자만 (179,167원)
+POST {{host}}/api/loans/repayment-preview
+Content-Type: application/json
+
+{
+  "loanType": "JEONSE",
+  "principal": 50000000,
+  "remainingMonths": 24
+}

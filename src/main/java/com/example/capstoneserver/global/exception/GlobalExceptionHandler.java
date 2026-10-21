@@ -38,6 +38,13 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.onFailure(ErrorStatus.BAD_REQUEST, errors));
     }
 
+    // 서비스에서 직접 검사한 칸별 오류 (입력 검사 API)
+    @ExceptionHandler(FieldValidationException.class)
+    public ResponseEntity<ApiResponse<Map<String, String>>> handleFieldValidation(FieldValidationException e) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.onFailure(ErrorStatus.BAD_REQUEST, e.getErrors()));
+    }
+
     // JSON 모양이 깨졌거나 Enum 값이 틀림
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Void>> handleUnreadable(HttpMessageNotReadableException e) {
