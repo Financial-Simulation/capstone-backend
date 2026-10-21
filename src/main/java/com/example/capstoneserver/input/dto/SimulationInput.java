@@ -120,6 +120,13 @@ public record SimulationInput(
             return total;
         }
 
+        /** 계산할 때는 TOTAL 방식이면 total이 꼭 있어야 한다 */
+        @JsonIgnore
+        @AssertTrue(groups = InputStep.Basic.class, message = "합계를 입력해 주세요")
+        public boolean isTotalPresentWhenTotalMode() {
+            return inputMode != InputMode.TOTAL || total != null;
+        }
+
         @JsonIgnore
         @AssertTrue(message = "합계는 0원 ~ 3,000만 원 사이여야 해요")
         public boolean isResolvedTotalInRange() {
