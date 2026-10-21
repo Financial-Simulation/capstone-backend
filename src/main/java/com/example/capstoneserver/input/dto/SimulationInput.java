@@ -112,19 +112,19 @@ public record SimulationInput(
             if (items == null) items = List.of();
         }
 
-        /** 이 묶음의 확정 합계 */
-        public long resolvedTotal() {
+        /** 이 묶음의 확정 합계. 아직 입력 전이면 null */
+        public Long resolvedTotal() {
             if (inputMode == InputMode.DETAIL) {
                 return items.stream().mapToLong(i -> i.amount() == null ? 0 : i.amount()).sum();
             }
-            return total == null ? 0 : total;
+            return total;
         }
 
         @JsonIgnore
         @AssertTrue(message = "합계는 0원 ~ 3,000만 원 사이여야 해요")
         public boolean isResolvedTotalInRange() {
-            long sum = resolvedTotal();
-            return sum >= 0 && sum <= 30_000_000;
+            Long sum = resolvedTotal();
+            return sum == null || (sum >= 0 && sum <= 30_000_000);
         }
     }
 

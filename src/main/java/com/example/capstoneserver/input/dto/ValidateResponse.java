@@ -5,7 +5,7 @@ import java.util.List;
 
 /**
  * POST /api/inputs/validate 응답.
- * 아직 안 나온 화면의 값은 null (예: BASIC 단계면 대출·저축·자산 합계는 null).
+ * 계산에 필요한 값이 아직 없으면 null (예: 대출 정보를 안 보냈으면 대출 합계·남는 돈은 null).
  */
 public record ValidateResponse(
         InputStep step,

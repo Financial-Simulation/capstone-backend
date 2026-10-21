@@ -66,3 +66,20 @@ Content-Type: application/json
   "principal": 50000000,
   "remainingMonths": 24
 }
+
+### 5. 예정된 일 프리셋 5종
+GET {{host}}/api/events/presets
+
+### 6. 입력 검사 - 01-1 값만 보냄 (빈 칸은 검사 안 함, 대출 합계는 null)
+POST {{host}}/api/inputs/validate
+Content-Type: application/json
+
+{
+  "input": {
+    "income": { "monthlyNetIncome": 2500000 },
+    "expenses": {
+      "fixed": { "inputMode": "TOTAL", "total": 950000 },
+      "variable": { "inputMode": "TOTAL", "total": 950000 }
+    }
+  }
+}

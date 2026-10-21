@@ -98,12 +98,50 @@ class InputControllerTest {
     }
 
     @Test
-    void BASIC_단계는_대출_합계를_비워둔다() throws Exception {
-        call("BASIC", S1)
+    void 들어온_값만_검사하고_구할_수_없는_합계는_비워둔다() throws Exception {
+        // 01-1 화면 값만 보냄 (나이·대출·저축 없음) → 빈 칸 오류 없이 200
+        String basicOnly = """
+                {
+                  "income": { "monthlyNetIncome": 2500000 },
+                  "expenses": {
+                    "fixed": { "inputMode": "TOTAL", "total": 950000 },
+                    "variable": { "inputMode": "TOTAL", "total": 950000 }
+                  }
+                }
+                """;
+        call("BASIC", basicOnly)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.summary.monthlyNetIncome").value(2_500_000))
+                .andExpect(jsonPath("$.result.summary.fixedTotal").value(950_000))
                 .andExpect(jsonPath("$.result.summary.monthlyLoanPayment").doesNotExist())
-                .andExpect(jsonPath("$.result.policySaving").doesNotExist());
+                .andExpect(jsonPath("$.result.summary.monthlySurplus").doesNotExist())
+                .andExpect(jsonPath("$.result.policySaving").doesNotExist())
+                .andExpect(jsonPath("$.result.warnings.length()").value(0));
+    }
+
+    @Test
+    void 빈_입력도_오류_없이_200() throws Exception {
+        call("BASIC", "{}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.warnings.length()").value(0));
+    }
+
+    @Test
+    void 지출이_소득_이상이면_경고() throws Exception {
+        String input = """
+                {
+                  "income": { "monthlyNetIncome": 2000000 },
+                  "expenses": {
+                    "fixed": { "inputMode": "TOTAL", "total": 1200000 },
+                    "variable": { "inputMode": "TOTAL", "total": 800000 }
+                  }
+                }
+                """;
+        call("BASIC", input)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.warnings[0].code").value("WARN_EXPENSE_OVER_INCOME"))
+                .andExpect(jsonPath("$.result.warnings[0].message")
+                        .value("지출(200만 원)이 월 실수령액(200만 원) 이상이라 매달 모자라요."));
     }
 
     @Test
