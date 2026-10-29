@@ -15,6 +15,7 @@
 |---|---|---|
 | [api-spec-revamp](tasks/api-spec-revamp/decision.md) | 노션 반영 완료 (2026-10-08) | 엔드포인트 32개 → 12개, 서버 입력 비저장 |
 | [infra-queue-k6-aws-cicd](tasks/infra-queue-k6-aws-cicd/plan.md) | 팀 합의 전 | `/robust` 작업 큐, k6 부하 테스트, AWS, CI/CD |
+| [presentation-demo](tasks/presentation-demo/plan.md) | 확정 (2026-10-29) | 피드백에 답하는 발표 PPT 12장(약 8분)과 대본, 데모 수준 B(입력 라이브 + 미리 계산한 결과) |
 
 ## 원본 문서
 
