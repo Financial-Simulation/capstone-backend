@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>내 저축 계획, 이뤄질 가능성은?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hahmlet:wght@500;600;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F3F5F8; --surface:#FFFFFF; --ink:#16233A; --muted:#5A6A80; --line:#D9E0EA; --soft:#E9EEF4;
+  --band:#2F7F86; --band-soft:rgba(47,127,134,.16); --band-mid:rgba(47,127,134,.30); --median:#1D5F66;
+  --debt:#B4442F; --debt-soft:rgba(180,68,47,.08); --alt:#C98A1E; --alt-soft:rgba(201,138,30,.16);
+  --good:#2E7D4F; --focus:#2F6FDB;
+  --serif:"Hahmlet","Noto Serif KR","Apple SD Gothic Neo",serif;
+  --sans:"IBM Plex Sans KR","Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0F1620; --surface:#16202C; --ink:#E6ECF3; --muted:#9AA9BC; --line:#2A3746; --soft:#1D2936;
+  --band:#5DB3B9; --band-soft:rgba(93,179,185,.16); --band-mid:rgba(93,179,185,.30); --median:#8FD3D8;
+  --debt:#E07B62; --debt-soft:rgba(224,123,98,.10); --alt:#E8B54D; --alt-soft:rgba(232,181,77,.18); --good:#6CC08F; --focus:#7FA8FF; } }
+:root[data-theme="dark"]{
+  --bg:#0F1620; --surface:#16202C; --ink:#E6ECF3; --muted:#9AA9BC; --line:#2A3746; --soft:#1D2936;
+  --band:#5DB3B9; --band-soft:rgba(93,179,185,.16); --band-mid:rgba(93,179,185,.30); --median:#8FD3D8;
+  --debt:#E07B62; --debt-soft:rgba(224,123,98,.10); --alt:#E8B54D; --alt-soft:rgba(232,181,77,.18); --good:#6CC08F; --focus:#7FA8FF; }
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;word-break:keep-all;overflow-wrap:break-word;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 64px}
+header.top{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 16px;margin:4px 0 18px}
+header.top h1{font-family:var(--serif);font-weight:600;font-size:20px;margin:0;letter-spacing:-.01em}
+header.top p{margin:0;color:var(--muted);font-size:13.5px;max-width:52ch}
+.examples{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 16px}
+.examples span{font-size:13px;color:var(--muted);align-self:center;margin-right:4px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer}
+.chip[aria-pressed="true"]{border-color:var(--band);color:var(--band);font-weight:600}
+.layout{display:grid;grid-template-columns:minmax(0,1fr);gap:20px}
+@media (min-width:960px){.layout{grid-template-columns:360px minmax(0,1fr);align-items:start}.inputs{position:sticky;top:calc(16px + env(safe-area-inset-top,0px));max-height:calc(100vh - 32px);overflow:auto}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.inputs{padding:16px}
+fieldset{border:0;margin:0 0 14px;padding:0}
+legend{font-weight:600;font-size:14px;padding:0;margin:0 0 8px;display:flex;gap:8px;align-items:center}
+legend .n{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--soft);font-size:12px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:12.5px;color:var(--muted)}
+.inp{display:flex;align-items:center;border:1px solid var(--line);border-radius:9px;background:var(--bg);padding:0 10px;height:38px}
+.inp input,.inp select{border:0;background:transparent;width:100%;min-width:0;font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums;outline:none}
+.inp:focus-within{border-color:var(--focus)}
+.inp .u{font-size:12.5px;color:var(--muted);white-space:nowrap;margin-left:4px}
+.msg{font-size:12.5px;margin:6px 0 0;min-height:0}
+.msg .err{color:var(--debt)} .msg .warn{color:var(--alt)}
+details.more{border-top:1px solid var(--line);padding-top:10px;margin-top:4px}
+details.more>summary{cursor:pointer;font-size:13.5px;font-weight:600;list-style:none}
+details.more>summary::-webkit-details-marker{display:none}
+details.more>summary::before{content:"+";display:inline-block;width:16px;color:var(--muted)}
+details.more[open]>summary::before{content:"−"}
+.sub{font-size:12.5px;color:var(--muted);margin:10px 0 6px}
+.evrow{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;font-size:13.5px;padding:6px 0;border-bottom:1px dashed var(--line)}
+.evrow:last-child{border-bottom:0}
+.evrow .when{display:flex;align-items:center;gap:4px;color:var(--muted);font-size:12.5px}
+.evrow .when input{width:44px;height:30px;border:1px solid var(--line);border-radius:7px;background:var(--bg);text-align:center;font-variant-numeric:tabular-nums}
+.small{font-size:12px;color:var(--muted)}
+.loanq{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0 0}
+.loanq .f-label{font-size:13.5px}
+.loanq .seg{width:150px}
+.loancard{border:1px solid var(--line);border-radius:11px;padding:10px 10px 8px;margin:10px 0 0;background:var(--surface)}
+.loancard .head{display:flex;justify-content:space-between;align-items:center;margin:0 0 6px;font-size:13px;font-weight:600}
+.loancard .rm{border:0;background:none;color:var(--muted);cursor:pointer;font-size:12.5px;text-decoration:underline}
+.loancard .hint{font-size:11.5px;color:var(--muted);margin:5px 0 0}
+.btn.addloan{margin-top:8px;width:100%;font-size:13px}
+.linkbtn{background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;padding:0;font-size:12px}
+.results{display:flex;flex-direction:column;gap:20px;min-width:0}
+.hero{padding:22px 22px 8px}
+.hero .lead{font-family:var(--serif);font-weight:600;font-size:clamp(25px,3.6vw,38px);line-height:1.35;letter-spacing:-.015em;margin:0 0 10px;max-width:24ch}
+.hero .lead .pct{font-variant-numeric:tabular-nums}
+.hero .calc{margin:0 0 6px;color:var(--muted);max-width:60ch}
+.hero .range{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:10px 0 0;font-size:13.5px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:7px 12px;cursor:pointer;font-size:13.5px;font-weight:500}
+.btn.primary{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.btn:disabled{opacity:.55;cursor:default}
+.progress{height:4px;background:var(--soft);border-radius:4px;overflow:hidden;width:140px}
+.progress i{display:block;height:100%;width:0;background:var(--band);transition:width .2s}
+.chart-wrap{padding:0 10px 4px;overflow-x:auto}
+svg.fan{width:100%;height:auto;display:block}
+.fan text{font-family:var(--sans);font-size:12px;fill:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;padding:4px 22px 18px;font-size:12.5px;color:var(--muted)}
+.legend b{display:inline-block;width:18px;height:10px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.cps{padding:0 22px 20px;overflow-x:auto}
+table.t{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+table.t th,table.t td{padding:7px 8px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+table.t th:first-child,table.t td:first-child{text-align:left}
+table.t thead th{font-weight:500;color:var(--muted);font-size:12.5px}
+td.neg{color:var(--debt)}
+section.block{padding:18px 22px}
+section.block h2{font-size:16px;margin:0 0 4px;font-weight:600}
+section.block>p.desc{margin:0 0 12px;color:var(--muted);font-size:13.5px;max-width:64ch}
+.risk{display:grid;grid-template-columns:118px 1fr;gap:4px 14px;padding:12px 0;border-top:1px solid var(--line)}
+.risk:first-of-type{border-top:0}
+.risk .big{font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
+.risk .big.neg{color:var(--debt)}
+.risk .big.money{font-size:18px;white-space:nowrap}
+.risk .what{font-size:14px}
+.risk .why{font-size:12.5px;color:var(--muted)}
+.cause{display:flex;height:8px;border-radius:4px;overflow:hidden;margin:8px 0 4px;background:var(--soft)}
+.cause i{display:block;height:100%}
+.cause-legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted)}
+.cause-legend b{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:middle}
+.lever{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:11px 0;border-top:1px solid var(--line);align-items:baseline}
+.lever:first-of-type{border-top:0}
+.lever .act{font-size:14.5px;font-weight:500}
+.lever .eff{font-variant-numeric:tabular-nums;font-weight:600;text-align:right}
+.lever .eff.up{color:var(--good)} .lever .eff.flat{color:var(--muted);font-weight:500}
+.lever .note{grid-column:1/-1;font-size:12.5px;color:var(--muted)}
+.reverse{margin-top:12px;padding:12px 14px;border-radius:10px;background:var(--band-soft);font-size:14px}
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px 18px;margin:6px 0 14px}
+.ctl label{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:4px}
+.ctl label output{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--alt)}
+.seg{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{flex:1;border:0;background:var(--surface);padding:6px 0;font-size:13px;cursor:pointer;border-left:1px solid var(--line)}
+.seg button:first-child{border-left:0}
+.seg button[aria-pressed="true"]{background:var(--alt-soft);font-weight:600}
+.cmp th:nth-child(2),.cmp td:nth-child(2){color:var(--muted)}
+.tag{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:999px;margin-left:6px;vertical-align:1px}
+.tag.yes{background:var(--alt-soft);color:var(--ink)} .tag.no{background:var(--soft);color:var(--muted)}
+.ev-toggles{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 12px}
+details.ev{border-top:1px solid var(--line);padding:10px 0}
+details.ev>summary{cursor:pointer;font-weight:600;font-size:14px}
+details.ev p,details.ev li{font-size:13.5px;color:var(--ink);max-width:70ch}
+details.ev .t{margin:8px 0}
+.why-btn{border:0;background:none;color:var(--band);cursor:pointer;font-size:12px;padding:0 0 0 4px;text-decoration:underline;text-underline-offset:2px}
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink);max-width:min(520px,calc(100vw - 32px));padding:18px 20px}
+dialog::backdrop{background:rgba(10,18,30,.35)}
+dialog h3{margin:0 0 8px;font-size:15.5px}
+dialog p{margin:0 0 8px;font-size:14px}
+dialog .grade{font-size:12.5px;color:var(--muted)}
+.busy{opacity:.55;transition:opacity .15s}
+footer.note{color:var(--muted);font-size:12px;margin-top:28px;max-width:80ch}
+@media (max-width:520px){.hero{padding:18px 16px 6px}section.block{padding:16px}.cps,.legend{padding-left:16px;padding-right:16px}.risk{grid-template-columns:96px 1fr}.risk .big{font-size:21px}.risk .big.money{font-size:16px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>내 저축 계획, 이뤄질 가능성은?</h1>
+    <p>소득과 지출을 넣으면 실직·급한 지출·물가·연봉 변화가 섞인 미래 2,000개를 계산해, 목표에 닿을 가능성과 무엇을 바꾸면 좋은지 알려줘요.</p>
+  </header>
+  <div class="examples" role="group" aria-label="예시 불러오기">
+    <span>예시로 보기</span>
+    <button class="chip" data-ex="s1">27세 개발자</button>
+    <button class="chip" data-ex="s2">24세 첫 직장</button>
+    <button class="chip" data-ex="s3">36세 계약직, 이사 예정</button>
+  </div>
+
+  <div class="layout">
+    <form class="panel inputs" id="form" autocomplete="off" onsubmit="return false">
+      <fieldset>
+        <legend><span class="n">1</span>나에 대해</legend>
+        <div class="grid2">
+          <label class="f">나이<span class="inp"><input type="number" name="age" min="19" max="39" step="1"><span class="u">세</span></span></label>
+          <label class="f">경력<span class="inp"><input type="number" name="exp_years" min="0" max="10" step="0.5"><span class="u">년</span></span></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend><span class="n">2</span>매달 돈</legend>
+        <label class="f">월 실수령액<span class="inp"><input type="number" name="net_income" min="1" step="5"><span class="u">만 원</span></span></label>
+        <div class="grid2" style="margin-top:8px">
+          <label class="f">고정지출 <span class="small">월세·통신·보험</span><span class="inp"><input type="number" name="fixed" min="0" step="5"><span class="u">만 원</span></span></label>
+          <label class="f">변동지출 <span class="small">식비·쇼핑·여가</span><span class="inp"><input type="number" name="variable" min="0" step="5"><span class="u">만 원</span></span></label>
+        </div>
+        <label class="f" style="margin-top:8px">월 저축액<span class="inp"><input type="number" name="save" min="0" step="5"><span class="u">만 원</span></span></label>
+        <p class="small" id="surplus" style="margin:6px 0 0"></p>
+      </fieldset>
+      <fieldset>
+        <legend><span class="n">3</span>지금 가진 돈과 빚</legend>
+        <label class="f">현금·예적금 합계<span class="inp"><input type="number" name="cash0" min="0" step="10"><span class="u">만 원</span></span></label>
+        <div class="loanq">
+          <span class="f-label" id="loanQ">대출이 있나요?</span>
+          <div class="seg" role="group" aria-labelledby="loanQ" id="hasLoan">
+            <button type="button" data-v="0" aria-pressed="true">없어요</button>
+            <button type="button" data-v="1" aria-pressed="false">있어요</button>
+          </div>
+        </div>
+        <div id="loans" hidden></div>
+        <button type="button" class="btn addloan" id="addLoan" hidden>대출 하나 더 추가</button>
+        <p class="small" id="loanNote" hidden style="margin:6px 0 0">종류를 고르면 평균 금리와 흔한 갚는 방식이 채워져요. 내 대출 조건으로 고쳐 주세요.</p>
+      </fieldset>
+      <fieldset>
+        <legend><span class="n">4</span>목표</legend>
+        <div class="grid2">
+          <label class="f">모을 금액<span class="inp"><input type="number" name="goal" min="1" step="100"><span class="u">만 원</span></span></label>
+          <label class="f">언제까지<span class="inp"><select name="goal_years"></select></span></label>
+        </div>
+      </fieldset>
+      <div class="msg" id="msg" aria-live="polite"></div>
+
+      <details class="more" id="more">
+        <summary>더 정확하게 (선택)</summary>
+        <div class="grid2" style="margin-top:10px">
+          <label class="f">고용형태<span class="inp"><select name="employment"><option value="정규">정규직</option><option value="계약">계약직</option></select></span></label>
+          <label class="f">급할 때 버틸 금액<span class="inp"><input type="number" name="thr" min="0" step="10"><span class="u">만 원</span></span></label>
+        </div>
+        <p class="small" style="margin:4px 0 0">마이너스가 이 금액을 넘으면 적금을 깬다고 보고 계산해요.</p>
+        <label class="f" style="margin-top:10px">일반 적금 금리<span class="inp"><input type="number" name="general_rate" min="0" max="10" step="0.01"><span class="u">% (연)</span></span></label>
+        <p class="small" style="margin:4px 0 0">청년미래적금 대상이 아니거나 한도를 넘는 저축에 써요. 기본값 3.03%는 2025년 은행 정기적금 평균이에요. 가입한 상품이 있으면 그 금리로 고쳐 주세요.</p>
+        <p class="sub">투자 자산 <span class="small">— 입력한 금액 그대로 계산하고, 오르내림과 급할 때 팔아 쓰는 상황은 넣지 않아요.</span></p>
+        <div class="grid2">
+          <label class="f">현재 가치<span class="inp"><input type="number" name="invest0" min="0" step="50"><span class="u">만 원</span></span></label>
+          <label class="f">월 투자액<span class="inp"><input type="number" name="invest_monthly" min="0" step="5"><span class="u">만 원</span></span></label>
+        </div>
+        <p class="sub">예정된 일</p>
+        <div id="events"></div>
+        <p class="small" style="margin-top:10px">입력값은 이 기기에만 저장돼요. <button type="button" class="linkbtn" id="clearSaved">저장된 입력 지우기</button></p>
+      </details>
+    </form>
+
+    <main class="results" id="results">
+      <section class="panel" aria-live="polite">
+        <div class="hero">
+          <p class="lead" id="lead">계산하는 중이에요</p>
+          <p class="calc" id="calc"></p>
+          <div class="range">
+            <span id="rangeText" class="small">이 확률은 가정에 따라 달라질 수 있어요.</span>
+            <button class="btn" id="rangeBtn" type="button">가정을 바꿔도 어느 범위인지 계산하기</button>
+            <span class="progress" id="rangeProg" hidden><i></i></span>
+          </div>
+        </div>
+        <div class="chart-wrap"><svg class="fan" id="fan" viewBox="0 0 760 330" role="img" aria-label="시간에 따른 모은 돈의 범위"></svg></div>
+        <div class="legend" id="legend"></div>
+        <div class="cps"><table class="t" id="cps"></table></div>
+      </section>
+
+      <section class="panel block">
+        <h2>위험은 얼마나 클까</h2>
+        <p class="desc">같은 조건의 2,000가지 미래 중 몇 가지에서 일어나는지로 셌어요.</p>
+        <div id="risks"></div>
+      </section>
+
+      <section class="panel block">
+        <h2>무엇을 바꾸면 좋을까</h2>
+        <p class="desc">같은 2,000가지 미래에서 한 가지씩만 바꿔 다시 계산했어요. 효과가 큰 순서예요.</p>
+        <div id="levers"><p class="small">계산하는 중이에요</p></div>
+        <div class="reverse" id="reverse" hidden></div>
+      </section>
+
+      <section class="panel block">
+        <h2>직접 바꿔보기</h2>
+        <p class="desc">바꾼 계획은 그래프에 호박색 선으로 함께 보여요.</p>
+        <div class="controls">
+          <div class="ctl"><label for="c_var">변동지출 조정 <output id="o_var">0만 원</output></label><input type="range" id="c_var" min="-50" max="30" step="5" value="0"></div>
+          <div class="ctl"><label for="c_save">월 저축액 <output id="o_save"></output></label><input type="range" id="c_save" min="0" max="150" step="5"></div>
+          <div class="ctl"><label for="c_goal">목표 시점 <output id="o_goal"></output></label><input type="range" id="c_goal" min="12" max="120" step="12"></div>
+          <div class="ctl"><label>비상금을 먼저 모은 뒤 적금 시작</label><div class="seg" id="c_buf" role="group" aria-label="비상금 먼저 모으기"></div></div>
+        </div>
+        <div class="ev-toggles" id="c_events" role="group" aria-label="바꾼 계획에 넣을 일"></div>
+        <div style="overflow-x:auto"><table class="t cmp" id="cmp"></table></div>
+        <p class="small" id="cmpNote" style="margin-top:8px"></p>
+      </section>
+
+      <section class="panel block">
+        <h2>이 숫자는 어디서 왔을까</h2>
+        <details class="ev"><summary>확률은 무슨 뜻인가요</summary>
+          <p>"가능성 58%"는 나와 같은 조건인 사람 100명 중 58명꼴로 목표에 닿는다는 뜻이에요. 한 사람의 미래를 맞히는 숫자가 아니라, 계획이 얼마나 흔들릴 수 있는지 보여주는 숫자예요.</p>
+          <p>그래서 이 서비스는 절대 확률보다 <b>선택지 사이의 차이</b>를 더 믿을 만한 정보로 봐요. 가정을 바꿔도 절대값은 넓게 움직이지만, "지출을 줄이면 가능성이 오른다" 같은 비교는 거의 항상 유지돼요.</p>
+        </details>
+        <details class="ev"><summary>어떤 숫자를 썼나요</summary>
+          <div style="overflow-x:auto" class="t"><table class="t" id="params"></table></div>
+          <p class="small">등급: A 법령·제도 · B 공공통계 그대로 · C 공공통계를 모델 형태로 변환 · D 다른 통계에 맞춰 역산 · E 가정</p>
+        </details>
+        <details class="ev"><summary>얼마나 믿을 수 있나요</summary>
+          <p>보정에 쓰지 않은 실제 기록으로 확인했어요. 2022년 2~3월에 청년희망적금에 가입한 286.8만 명이 2년 동안 중도해지한 비율을, 당시 물가(2022년 5.1%, 2023년 3.6%)와 실업률을 넣어 예측했어요.</p>
+          <table class="t"><thead><tr><th>시점</th><th>모델</th><th>실제 (실업·급전 사유 환산)</th></tr></thead>
+            <tbody><tr><td>가입 16개월</td><td>17.0%</td><td>17.6%</td></tr><tr><td>22개월</td><td>21.6%</td><td>21.0%</td></tr><tr><td>24개월 (만기)</td><td>22.3%</td><td>21.4%</td></tr></tbody></table>
+          <p>계산 엔진은 파이썬 기준 구현과 같은 난수를 넣었을 때 모든 경로의 매달 잔액이 1조분의 1 이내로 같아요. 가정을 60가지로 바꿔도 "비상금을 먼저 모으면 해지 위험이 줄어든다", "적금을 한도까지 넣으면 해지 위험이 커진다"는 비교는 60번 모두 유지됐어요.</p>
+        </details>
+        <details class="ev"><summary>계산에 넣지 않은 것</summary>
+          <ul>
+            <li>투자 자산의 오르내림 (입력 금액 그대로 계산)</li>
+            <li>집 매매·청약, 결혼·출산이 "일어날 확률" (예정된 일로 직접 넣을 때만 반영)</li>
+            <li>맞벌이·부양가족이 있는 가구, 프리랜서·자영업자</li>
+            <li>은행별 우대금리, 청년미래적금 우대형 (기본금리·일반형만 반영해서 실제보다 조금 보수적이에요)</li>
+            <li>실직과 급한 지출이 동시에 몰리는 경기 침체 (각각 따로 일어난다고 계산)</li>
+          </ul>
+        </details>
+      </section>
+    </main>
+  </div>
+  <footer class="note">사회초년생 재무 시뮬레이터 데모 · 캡스톤디자인 6조. 이 결과는 입력값과 공공통계에 기반한 시뮬레이션이며 금융상품 추천이나 투자 권유가 아니에요.</footer>
+</div>
+
+<dialog id="why"><h3 id="whyT"></h3><div id="whyB"></div><form method="dialog" style="text-align:right;margin-top:8px"><button class="btn">닫기</button></form></dialog>
+
+<script>
+/* 재무 시뮬레이터 계산 엔진 — 파이썬 기준 구현 v1.6과 같은 순서·같은 수식 (단위: 만원 / 개월) */
+const ENGINE = (() => {
+  const PARAMS = {
+    inflation: { mu_y: 0.0208, sigma_y: 0.0132, phi: 0.55, last: 0.021 },
+    wage: { macro_mu: 0.0285, macro_sd: 0.0115, idio_sd: 0.115, rho_macro: 0.65,
+            exp_edges: [2.0, 4.0, 7.5], exp_prem: [0.0652, 0.0515, 0.0445, 0.0401] },
+    unemp: { age_edges: [25, 30, 35], u_by_age: [0.088, 0.074, 0.037, 0.025], exit_m: 0.092, invol_share: 0.274,
+             contract_ratio: 12.3 / 9.9, contract_share_pop: 0.34, scar_per_year: 0.067 },
+    ui: { floor: 198.144, cap: 204.3, replace: 0.60, waiting_frac: 7 / 30, gross_over_net: 1 / 0.88,
+          days_edges: [1, 3, 5, 10], days: [120, 150, 180, 210, 240], min_insured_m: 6, window_m: 18 },
+    spend: { raise_share: 0.45, unemp_cut_ui: 0.068, unemp_cut_noui: 0.22 },
+    shock: { prob_m: 0.0482, amounts: [[120.0, 0.70], [300.0, 0.30]] },
+    overdraft: { annual_rate: 0.0531 }, liquid: { annual_rate: 0.0068 },
+  };
+  const POLICY = { cap: 50.0, rate: 0.050, term: 36, match: 0.06, match_cap: 3.0, window: 6, tax: 0.154, age_max: 34,
+                   gross_max_y: 7500.0, rejoin_wait: 2, rejoin: true,
+                   early_table: [[3, 0.5], [6, 0.7], [9, 0.8], [11, 0.9]], early_floor: 0.0015, early_under3: 0.001 };
+  const GENERAL = { rate: 0.0303, early_ratio: 0.5, tax: 0.154 };
+
+  // np.searchsorted(edges, x, side="right") = x 이하인 경계의 개수
+  const sr = (edges, x) => { let i = 0; while (i < edges.length && x >= edges[i]) i++; return i; };
+  function hazard(P, emp, age) {
+    const U = P.unemp, u = U.u_by_age[sr(U.age_edges, age)], h = u * U.exit_m / (1 - u);
+    const c = U.contract_share_pop, r = U.contract_ratio, base = 1 / ((1 - c) + c * r);
+    return h * (emp === "계약" ? base * r : emp === "정규" ? base : 1);
+  }
+  const expPrem = (P, y) => P.wage.exp_prem[sr(P.wage.exp_edges, y)];
+  const uiMonths = (P, tenure) => Math.round(P.ui.days[sr(P.ui.days_edges, tenure)] / 30);
+  function earlyRatio(pol, held) {
+    let ratio = 0; for (const [lo, k] of pol.early_table) if (held >= lo) ratio = k;
+    const eff = held < 3 ? pol.early_under3 : Math.max(pol.rate * ratio * held / pol.term, pol.early_floor);
+    return eff / pol.rate;
+  }
+  function loanSchedule(loans, T) {
+    const pay = new Float64Array(T), bal = new Float64Array(T);
+    for (const ln of loans || []) {
+      let B = +ln.balance; const i = ln.rate / 12, n = Math.trunc(ln.months), m = ln.method || "annuity";
+      const A = (m === "annuity" && i > 0) ? B * i * (1 + i) ** n / ((1 + i) ** n - 1) : (m === "annuity" ? B / n : 0);
+      for (let t = 0; t < T; t++) {
+        if (B <= 1e-9) continue;
+        const it = B * i; let p;
+        if (m === "annuity") p = Math.min(A, B + it);
+        else if (m === "equal_principal") p = Math.min(B, +ln.balance / n) + it;
+        else if (m === "interest_only") p = t < n ? it : 0;   // 전세자금: 원금은 보증금 반환으로 상환 (현금흐름 밖)
+        else p = it + (t === n - 1 ? B : 0);
+        B = m === "interest_only" ? B : Math.max(B - (p - it), 0); pay[t] += p; bal[t] += B;
+        if (m === "interest_only" && t === n - 1) B = 0;
+      }
+    }
+    return { pay, bal };
+  }
+  const geom = (u, e, cap) => Math.min(1 + Math.floor(Math.log(Math.min(Math.max(1 - u, 1e-12), 1)) / Math.log(1 - e)), cap);
+  function pick(u, pmf) { let c = 0; const cs = pmf.map(([, p]) => (c += p)); return pmf[Math.min(sr(cs, u), pmf.length - 1)][0]; }
+
+  // ── 난수: 경로 번호마다 결정되는 스트림 (공통 난수), 정규분포는 짝 경로끼리 부호 반대 (대조 변량)
+  function sfc32(a, b, c, d) {
+    return () => { a |= 0; b |= 0; c |= 0; d |= 0; const t = (((a + b) | 0) + d) | 0; d = (d + 1) | 0; a = b ^ (b >>> 9);
+      b = (c + (c << 3)) | 0; c = (c << 21) | (c >>> 11); c = (c + t) | 0; return (t >>> 0) / 4294967296; };
+  }
+  function mix(seed, k, s) { let h = (seed ^ 0x9e3779b9) >>> 0; for (const v of [k, s]) { h = Math.imul(h ^ (v + 0x7f4a7c15), 0x85ebca6b) >>> 0; h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35) >>> 0; h ^= h >>> 16; } return h; }
+  function rng(seed, k, s) { const r = sfc32(mix(seed, k, s), mix(seed, k, s + 11), mix(seed, k, s + 23), mix(seed, k, s + 37)); for (let i = 0; i < 12; i++) r(); return r; }
+  function randomNoise(seed, N) {
+    const half = N % 2 === 0 ? N / 2 : N;
+    return (p, T) => {
+      const Y = Math.floor(T / 12) + 1, k = p % half, sign = (N % 2 === 0 && p >= half) ? -1 : 1;
+      const rn = rng(seed, k, 1), ru = rng(seed, p, 2);
+      const gauss = () => { let u = 0; while (u === 0) u = rn(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rn()); };
+      const z1 = new Float64Array(T), z2 = new Float64Array(Y);
+      for (let j = 0; j < T; j++) z1[j] = sign * gauss();
+      for (let j = 0; j < Y; j++) z2[j] = sign * gauss();
+      const U = () => { const a = new Float64Array(T); for (let j = 0; j < T; j++) a[j] = ru(); return a; };
+      return { z1, z2, u_onset: U(), u_dur: U(), u_invol: U(), u_shock: U(), u_amt: U() };
+    };
+  }
+  const zeroNoise = () => (p, T) => {
+    const Y = Math.floor(T / 12) + 1, f = (n, v) => new Float64Array(n).fill(v);
+    return { z1: f(T, 0), z2: f(Y, 0), u_onset: f(T, 1), u_dur: f(T, 0), u_invol: f(T, 1), u_shock: f(T, 1), u_amt: f(T, 0) };
+  };
+
+  const FLAGS = ["unemp", "overdraft", "brk1_sp", "brk1_gen", "brkG", "mature1", "limit", "rejoin", "c1_sp", "c1_unemp", "c1_shock", "c1_deficit"];
+
+  function simulate(pr, P, noise, N, T, opt = {}) {
+    const bufferFirst = opt.bufferFirst || 0, collect = !!opt.collect, pol = opt.policy || POLICY, gen = opt.general || GENERAL;
+    const Pi = P.inflation, Wg = P.wage, U = P.unemp, UI = P.ui;
+    const age0 = +pr.age, exp0 = +pr.exp_years, net0 = +pr.net_income, sfix = +pr.fixed, svar = +pr.variable, save = +pr.save;
+    const thr = pr.thr ?? 50, invM = pr.invest_monthly || 0, emp = pr.employment || "정규";
+    const incomeOk = net0 * 12 * UI.gross_over_net <= pol.gross_max_y + 1e-6, eligible = age0 <= pol.age_max && incomeOk;
+    const a1 = eligible ? Math.min(save, pol.cap) : 0, e = U.exit_m;
+    const { pay: loanPay } = loanSchedule(pr.loans, T);
+    const ev = [...(pr.events || [])].sort((a, b) => a.t - b.t);
+    const epsSd = Pi.sigma_y * Math.sqrt(1 - Pi.phi ** 2), sig = Math.hypot(Wg.macro_sd, Wg.idio_sd), rho = sig > 0 ? Wg.rho_macro * Wg.macro_sd / sig : 0;
+    const gRate = pr.general_rate != null ? +pr.general_rate : gen.rate;   // 사용자가 아는 적금 금리 (없으면 시장 평균)
+    const rOd = P.overdraft.annual_rate / 12, rL = P.liquid.annual_rate / 12, rP = pol.rate / 12, rG = gRate / 12;
+    const uiAmt = Math.min(Math.max(UI.replace * net0 * UI.gross_over_net, UI.floor), UI.cap);
+
+    const saved = collect ? new Float64Array(N * (T + 1)) : null;
+    const flags = Object.fromEntries(FLAGS.map(k => [k, new Uint8Array(N)]));
+    const firstBrk = new Int32Array(N).fill(-1), matchPaid = new Float64Array(N);
+
+    for (let p = 0; p < N; p++) {
+      const nz = noise(p, T);
+      let L = +pr.cash0, od = 0, INV = pr.invest0 || 0, DEP = 0, P1 = 0, C1 = 0, M1 = 0, held = 0, act1 = a1 > 0;
+      let cumHeld = 0, matchMult = 1, wait = -1, G = 0, CG = 0, gHeld = 0, Mp = 0, started = (L >= bufferFirst) || (bufferFirst <= 0);
+      let base = net0, incomeMult = 1, cum = 1, piPrev = Pi.last, mInf = 0;
+      let unemp = 0, uiLeft = 0, uiFirst = false, since = 1e6, gapLen = 0, volGap = 0, lastShock = -99, extraFixed = 0;
+      let insured = Math.min(exp0 * 12, UI.window_m), mp = 0;
+      const row = p * (T + 1);
+      if (collect) saved[row] = L + P1 + G + INV + DEP - od;
+      for (let t = 0; t < T; t++) {
+        const ageNow = age0 + t / 12, expNow = exp0 + t / 12;
+        if (t % 12 === 0) {   // ① 연초: 물가 AR(1), 연봉 인상
+          const n = Math.min(12, T - t); let s = 0; for (let j = t; j < t + n; j++) s += nz.z1[j];
+          const pi = Pi.mu_y + Pi.phi * (piPrev - Pi.mu_y) + epsSd * (s / Math.sqrt(n));
+          mInf = (1 + pi) ** (1 / 12) - 1; piPrev = pi;
+          if (t > 0) {
+            let s2 = 0; for (let j = t - 12; j < t; j++) s2 += nz.z1[j];
+            const g = Wg.macro_mu + expPrem(P, expNow - 1) + sig * (rho * (s2 / Math.sqrt(12)) + Math.sqrt(1 - rho ** 2) * nz.z2[t / 12 - 1]);
+            base *= 1 + g;
+          }
+        }
+        cum *= 1 + mInf;
+        let lump = 0, depAdd = 0;   // ② 예정 이벤트
+        for (const x of ev) {
+          if (x.t !== t) continue;
+          if (x.kind === "lump") lump += x.amount;
+          else if (x.kind === "spend") extraFixed += x.delta;
+          else if (x.kind === "move") { depAdd += x.deposit || 0; extraFixed += x.delta || 0; lump += x.cost || 0; }
+          else if (x.kind === "income") { incomeMult *= 1 + (x.pct || 0); if ((x.gap || 0) > 0 && unemp === 0) volGap = Math.trunc(x.gap); }
+        }
+        // ③ 고용
+        const h = hazard(P, emp, ageNow);
+        const start = unemp === 0 && volGap === 0 && nz.u_onset[t] < h;
+        const D = geom(nz.u_dur[t], e, T), invol = nz.u_invol[t] < U.invol_share;
+        if (start) { unemp = D; gapLen = D; }
+        const uiOk = invol && insured >= UI.min_insured_m;
+        if (start) { uiLeft = uiOk ? uiMonths(P, expNow) : 0; if (uiOk) uiFirst = true; since = 0; }
+        if (volGap > 0) { unemp = Math.max(unemp, volGap); gapLen = volGap; since = 0; }
+        volGap = 0;
+        const employed = unemp === 0; if (!employed) flags.unemp[p] = 1;
+        const income = employed ? base * incomeMult : (uiLeft > 0 ? uiAmt * (uiFirst ? 1 - UI.waiting_frac : 1) : 0);
+        // ④ 월초 이자 (마이너스·파킹통장). 적금 이자는 납입 뒤
+        od *= 1 + rOd; L *= 1 + rL;
+        // ⑤ 급전 (금액은 물가 반영)
+        const hit = nz.u_shock[t] < P.shock.prob_m, shock = hit ? pick(nz.u_amt[t], P.shock.amounts) * cum : 0;
+        if (hit) lastShock = t;
+        // ⑥ 현금 흐름 (실직 중 소비 감소)
+        const lifestyle = P.spend.raise_share * Math.max(base * incomeMult - net0 * cum, 0);
+        const cut = employed ? 0 : (uiLeft > 0 ? P.spend.unemp_cut_ui : P.spend.unemp_cut_noui);
+        const living = ((sfix + svar + extraFixed) * cum + lifestyle) * (1 - cut);
+        L = L + income - living - shock - lump - loanPay[t] - depAdd; DEP += depAdd;
+        // ⑦ 마이너스 우선 상환
+        const rep = Math.min(Math.max(L, 0), od); L -= rep; od -= rep;
+        // ⑧ 재가입
+        if (pol.rejoin) {
+          if (wait > 0) wait -= 1;
+          if (wait === 0 && ageNow <= pol.age_max && incomeOk && cumHeld < pol.term) {
+            act1 = true; held = 0; flags.rejoin[p] = 1; matchMult = (pol.term - cumHeld) / pol.term; wait = -1;
+          }
+        }
+        // ⑨ 납입
+        started = started || L >= bufferFirst;
+        const can = employed && started;
+        const put1 = (can && act1) ? Math.min(a1, Math.max(L, 0)) : 0; L -= put1;
+        P1 += put1; C1 += put1; const mNew = Math.min(pol.match * put1, pol.match_cap) * matchMult; M1 += mNew; Mp += mNew;
+        const rest = act1 ? save - a1 : save;
+        const putG = can ? Math.min(rest, Math.max(L, 0)) : 0; L -= putG; G += putG; CG += putG;
+        const putI = employed ? Math.min(invM, Math.max(L, 0)) : 0; L -= putI; INV += putI;
+        // 적금 이자 (납입 직후 한 달치): 입금건별 단리
+        if (act1) { P1 += C1 * rP; M1 += Mp * rP; }
+        if (CG > 0) { G += CG * rG; gHeld += 1; if (gHeld >= 12) { CG += (G - CG) * (1 - gen.tax); G = CG; gHeld = 0; } } else gHeld = 0;
+        // ⑩ 만기
+        if (act1) { held += 1; cumHeld += 1; }
+        if (act1 && held >= pol.term) { mp += M1; L += P1 + M1; P1 = C1 = M1 = Mp = 0; flags.mature1[p] = 1; act1 = false; }
+        // ⑪ 부족분 → 마이너스
+        const deficit = Math.max(-L, 0); od += deficit; L = Math.max(L, 0); if (deficit > 0) flags.overdraft[p] = 1;
+        // ⑫ 해지: 일반 적금 먼저, 그다음 청년미래적금
+        if (od > thr && G > 0) {
+          const prG = CG + (G - CG) * gen.early_ratio * (1 - gen.tax), r2 = Math.min(prG, od);
+          od -= r2; L += prG - r2; G = 0; CG = 0; gHeld = 0; flags.brkG[p] = 1;
+        }
+        if (act1 && od > thr) {
+          const sp = since <= pol.window, er = earlyRatio(pol, held);
+          const pr1 = sp ? P1 + M1 : C1 + (P1 - C1) * er * (1 - pol.tax); if (sp) mp += M1;
+          const r3 = Math.min(pr1, od); od -= r3; L += pr1 - r3;
+          P1 = C1 = M1 = Mp = 0; act1 = false; wait = pol.rejoin_wait;
+          if (firstBrk[p] < 0) {
+            firstBrk[p] = t;
+            if (sp) flags.c1_sp[p] = 1;
+            else if (!employed) flags.c1_unemp[p] = 1;
+            else if (t - lastShock <= 2) flags.c1_shock[p] = 1;
+            else flags.c1_deficit[p] = 1;
+          }
+          if (sp) flags.brk1_sp[p] = 1; else flags.brk1_gen[p] = 1;
+        }
+        if (od > thr) flags.limit[p] = 1;
+        // ⑬ 카운터 + 재취업 임금 손실
+        if (!employed && unemp === 1) base *= Math.max(1 - U.scar_per_year * gapLen / 12, 0.5);
+        insured = employed ? Math.min(insured + 1, UI.window_m) : Math.max(insured - 1, 0);
+        unemp = Math.max(unemp - 1, 0);
+        if (!employed) { uiLeft = Math.max(uiLeft - 1, 0); uiFirst = false; }
+        since += 1;
+        if (collect) saved[row + t + 1] = L + P1 + G + INV + DEP - od;
+      }
+      matchPaid[p] = mp;
+    }
+    return { saved, flags, firstBrk, matchPaid, eligible, N, T };
+  }
+
+  const clone = o => JSON.parse(JSON.stringify(o));
+  return { PARAMS, POLICY, GENERAL, simulate, randomNoise, zeroNoise, clone, FLAGS };
+})();
+if (typeof module !== "undefined") module.exports = ENGINE;
+
+</script>
+<script>
+(() => {
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const N = 2000, SEED = 20261007;
+const EX = {
+  s1: { age: 27, exp_years: 2, net_income: 250, fixed: 95, variable: 95, save: 50, cash0: 200, goal: 3000, goal_years: 5, employment: "정규", thr: 50, general_rate: 3.03,
+        hasLoan: true, loans: [{ kind: "학자금", balance: 1200, rate: 1.9, months: 96, method: "annuity" }], invest0: 0, invest_monthly: 0, events: [] },
+  s2: { age: 24, exp_years: 0, net_income: 230, fixed: 85, variable: 80, save: 50, cash0: 0, goal: 1500, goal_years: 3, employment: "정규", thr: 50, general_rate: 3.03,
+        hasLoan: true, loans: [{ kind: "학자금", balance: 800, rate: 1.7, months: 120, method: "annuity" }], invest0: 0, invest_monthly: 0, events: [] },
+  s3: { age: 36, exp_years: 8, net_income: 320, fixed: 110, variable: 100, save: 60, cash0: 1500, goal: 5000, goal_years: 5, employment: "계약", thr: 100, general_rate: 3.03,
+        hasLoan: false, loans: [], invest0: 0, invest_monthly: 0, events: [{ id: "move", y: 1 }] },
+};
+// 예정된 일 프리셋 (보고서 6.3)
+const PRESETS = {
+  move:  { label: "전세 이사", desc: "보증금 1,000만 원(내 돈), 주거비 월 −30만 원, 이사비 150만 원", make: m => [{ t: m, kind: "move", deposit: 1000, delta: -30, cost: 150 }] },
+  job:   { label: "이직", desc: "연봉 10% 오름, 쉬는 기간 2개월", make: m => [{ t: m, kind: "income", pct: 0.10, gap: 2 }] },
+  wed:   { label: "결혼 비용", desc: "한 번에 800만 원", make: m => [{ t: m, kind: "lump", amount: 800 }] },
+  car:   { label: "자동차", desc: "구입 500만 원 + 유지비 월 30만 원", make: m => [{ t: m, kind: "lump", amount: 500 }, { t: m, kind: "spend", delta: 30 }] },
+  indep: { label: "독립", desc: "보증금 500만 원, 월세 등 월 +45만 원", make: m => [{ t: m, kind: "move", deposit: 500, delta: 45, cost: 80 }] },
+};
+
+// ── 입력
+const form = $("#form"), F = n => form.elements[n];
+// 대출: 먼저 있음/없음을 묻고, 있으면 대출마다 상세 입력 (여러 건)
+const KINDS = { "학자금": { rate: 1.7, method: "annuity" }, "전세자금": { rate: 4.3, method: "interest_only" }, "신용": { rate: 6.3, method: "annuity" }, "주택담보": { rate: 4.7, method: "annuity" }, "기타": { rate: 5.0, method: "annuity" } };
+const METHOD_HINT = { annuity: "매달 같은 금액을 갚아요.", equal_principal: "원금을 똑같이 나눠 갚아서 처음에 더 많이 내요.", bullet: "매달 이자만 내고 원금은 마지막에 통장에서 한 번에 갚아요.", interest_only: "매달 이자만 계산해요. 원금은 이사할 때 돌려받는 보증금으로 갚는다고 봐요." };
+let HAS_LOAN = false;
+function loanCard(l = {}) {
+  const d = document.createElement("div"); d.className = "loancard";
+  d.innerHTML = `<div class="head"><span class="ttl"></span><button type="button" class="rm">삭제</button></div>
+    <div class="grid2">
+      <label class="f">종류<span class="inp"><select data-k="kind">${Object.keys(KINDS).map(k => `<option>${k}</option>`).join("")}</select></span></label>
+      <label class="f">남은 원금<span class="inp"><input type="number" data-k="balance" min="0" step="50"><span class="u">만 원</span></span></label>
+      <label class="f">연 이자율<span class="inp"><input type="number" data-k="rate" min="0" max="20" step="0.1"><span class="u">%</span></span></label>
+      <label class="f">남은 기간<span class="inp"><input type="number" data-k="months" min="1" max="480" step="1"><span class="u">개월</span></span></label>
+    </div>
+    <label class="f" style="margin-top:8px">갚는 방식<span class="inp"><select data-k="method"><option value="annuity">원리금균등</option><option value="equal_principal">원금균등</option><option value="bullet">만기일시</option><option value="interest_only">이자만 (보증금으로 원금 상환)</option></select></span></label>
+    <p class="hint"></p>`;
+  const q = k => d.querySelector(`[data-k="${k}"]`);
+  q("kind").value = l.kind || "학자금"; q("balance").value = l.balance ?? ""; q("rate").value = l.rate ?? KINDS[q("kind").value].rate;
+  q("months").value = l.months ?? ""; q("method").value = l.method || KINDS[q("kind").value].method;
+  const hint = () => d.querySelector(".hint").textContent = METHOD_HINT[q("method").value];
+  hint(); q("method").addEventListener("change", hint);
+  q("kind").addEventListener("change", () => { const k = KINDS[q("kind").value]; q("rate").value = k.rate; q("method").value = k.method; hint(); });
+  d.querySelector(".rm").addEventListener("click", () => { d.remove(); if (!$("#loans").children.length) setHasLoan(false); renumber(); form.dispatchEvent(new Event("change")); });
+  return d;
+}
+function renumber() { const cards = [...$("#loans").children]; cards.forEach((c, i) => { c.querySelector(".ttl").textContent = `대출 ${i + 1}`; c.querySelector(".rm").hidden = false; }); }
+function setHasLoan(v, loans) {
+  HAS_LOAN = v; $$("#hasLoan button").forEach(b => b.setAttribute("aria-pressed", (b.dataset.v === "1") === v));
+  $("#loans").hidden = !v; $("#addLoan").hidden = !v; $("#loanNote").hidden = !v;
+  if (loans) { $("#loans").innerHTML = ""; loans.forEach(l => $("#loans").append(loanCard(l))); }
+  if (v && !$("#loans").children.length) $("#loans").append(loanCard());
+  renumber();
+}
+$("#hasLoan").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; setHasLoan(b.dataset.v === "1"); form.dispatchEvent(new Event("change")); });
+$("#addLoan").addEventListener("click", () => { $("#loans").append(loanCard()); renumber(); });
+function readLoans() { return [...$("#loans").children].map(c => { const g = k => c.querySelector(`[data-k="${k}"]`).value;
+  const n = x => x === "" ? NaN : +x; return { kind: g("kind"), balance: n(g("balance")), rate: n(g("rate")), months: n(g("months")), method: g("method") }; }); }
+const gy = F("goal_years"); for (let y = 1; y <= 10; y++) gy.add(new Option(`${y}년 뒤`, y));
+const evBox = $("#events");
+for (const [k, p] of Object.entries(PRESETS)) {
+  const row = document.createElement("div"); row.className = "evrow";
+  row.innerHTML = `<input type="checkbox" id="ev_${k}" aria-label="${p.label}"><label for="ev_${k}"><b style="font-weight:500">${p.label}</b><br><span class="small">${p.desc}</span></label>
+    <span class="when"><input type="number" min="0" max="9" step="1" value="1" id="evy_${k}" aria-label="${p.label} 시점(년 뒤)">년 뒤</span>`;
+  evBox.append(row);
+}
+function readForm() {
+  const v = n => { const x = F(n).value; return x === "" ? NaN : +x; };
+  const o = {}; for (const n of ["age", "exp_years", "net_income", "fixed", "variable", "save", "cash0", "goal", "goal_years", "thr", "invest0", "invest_monthly", "general_rate"]) o[n] = v(n);
+  o.employment = F("employment").value; o.hasLoan = HAS_LOAN; o.loans = HAS_LOAN ? readLoans() : [];
+  o.events = Object.keys(PRESETS).filter(k => $("#ev_" + k).checked).map(k => ({ id: k, y: +$("#evy_" + k).value || 0 }));
+  return o;
+}
+function writeForm(o) {
+  for (const [k, val] of Object.entries(o)) if (F(k) && k !== "events" && k !== "loans") F(k).value = val;
+  setHasLoan(!!o.hasLoan, o.loans || []);
+  for (const k of Object.keys(PRESETS)) { const e = (o.events || []).find(x => x.id === k); $("#ev_" + k).checked = !!e; $("#evy_" + k).value = e ? e.y : 1; }
+  if (((o.events || []).length || o.invest0) && window.matchMedia("(min-width:960px)").matches) $("#more").open = true;
+}
+function validate(o) {
+  const E = [], W = [];
+  const num = k => Number.isFinite(o[k]);
+  for (const [k, nm] of [["age", "나이"], ["exp_years", "경력"], ["net_income", "월 실수령액"], ["fixed", "고정지출"], ["variable", "변동지출"], ["save", "월 저축액"], ["cash0", "지금 가진 돈"], ["goal", "모을 금액"]])
+    if (!num(k)) E.push(`${nm}을(를) 숫자로 넣어 주세요.`);
+  if (E.length) return { E, W };
+  if (o.age < 19 || o.age > 39) E.push("나이는 만 19~39세만 계산할 수 있어요.");
+  if (o.exp_years < 0 || o.exp_years > 10) E.push("경력은 0~10년만 계산할 수 있어요.");
+  if (o.exp_years > o.age - 15) E.push("경력이 나이에 비해 길어요. 다시 확인해 주세요.");
+  if (o.net_income <= 0) E.push("월 실수령액은 0보다 커야 해요.");
+  for (const k of ["fixed", "variable", "save", "cash0", "thr", "invest0", "invest_monthly"]) if (num(k) && o[k] < 0) E.push("금액은 0 이상이어야 해요.");
+  if (o.goal <= 0) E.push("모을 금액은 0보다 커야 해요.");
+  if (num("general_rate") && (o.general_rate < 0 || o.general_rate > 10)) E.push("일반 적금 금리는 0~10%로 넣어 주세요.");
+  o.loans.forEach((l, i) => {
+    const nm = `대출 ${i + 1}(${l.kind})`;
+    if (!(l.balance > 0)) E.push(`${nm}: 남은 원금을 넣어 주세요.`);
+    if (!(l.months >= 1) || l.months > 480 || l.months % 1) E.push(`${nm}: 남은 기간을 1~480개월로 넣어 주세요.`);
+    if (!(l.rate >= 0 && l.rate <= 20)) E.push(`${nm}: 연 이자율을 0~20%로 넣어 주세요.`);
+  });
+  if (E.length) return { E: [...new Set(E)], W };
+  const surplus = o.net_income - o.fixed - o.variable - loanPay(o);
+  if (surplus < 0) W.push("지출이 소득보다 많아요. 매달 부족한 돈은 마이너스로 계산돼요.");
+  else if (o.save > surplus) W.push("저축액이 매달 남는 돈보다 커서 계획만큼 넣지 못하는 달이 생겨요.");
+  if (o.goal <= o.cash0 + (o.invest0 || 0)) W.push("지금 가진 돈이 이미 목표 이상이에요.");
+  if (o.age > 34) W.push("만 34세가 넘어 청년미래적금 대신 일반 적금으로 계산해요.");
+  else if (o.net_income * 12 / 0.88 > 7500) W.push("총급여가 7,500만 원을 넘어 청년미래적금 대신 일반 적금으로 계산해요.");
+  return { E, W };
+}
+function loanPay(o) {   // 첫 달 상환액 합계 (표시용)
+  return (o.loans || []).reduce((sum, l) => { if (!(l.balance > 0) || !(l.months >= 1)) return sum; const i = (l.rate || 0) / 1200, n = l.months, B = l.balance;
+    if (l.method === "annuity") return sum + (i > 0 ? B * i * (1 + i) ** n / ((1 + i) ** n - 1) : B / n);
+    if (l.method === "equal_principal") return sum + B / n + B * i; return sum + B * i; }, 0); }
+function toProfile(o, alt = {}) {
+  const events = (alt.events || o.events).flatMap(e => PRESETS[e.id].make(Math.max(0, Math.round(e.y * 12))));
+  return { age: o.age, exp_years: o.exp_years, net_income: o.net_income, fixed: o.fixed, variable: Math.max(0, o.variable + (alt.dVar || 0)),
+    cash0: o.cash0, save: alt.save ?? o.save, employment: o.employment, thr: Number.isFinite(o.thr) ? o.thr : 50,
+    invest0: o.invest0 || 0, invest_monthly: o.invest_monthly || 0, general_rate: Number.isFinite(o.general_rate) ? o.general_rate / 100 : null,
+    loans: (o.loans || []).map(l => ({ balance: l.balance, rate: (l.rate || 0) / 100, months: l.months, method: l.method })), events };
+}
+
+// ── 계산
+const P0 = ENGINE.PARAMS, FIRST = { ...ENGINE.POLICY, rejoin: false };
+const noise = ENGINE.randomNoise(SEED, N);
+function run(pr, goal, gm, buf = 0) {
+  const T = 120, r = ENGINE.simulate(pr, P0, noise, N, T, { collect: true, bufferFirst: buf });
+  const s = r.saved, W = T + 1, col = m => { const a = new Float64Array(N); for (let p = 0; p < N; p++) a[p] = s[p * W + m]; return a.sort(); };
+  const q = (a, x) => a[Math.min(N - 1, Math.floor(x * N))];
+  const band = []; for (let m = 0; m <= T; m++) { const a = col(m); band.push([q(a, .05), q(a, .1), q(a, .5), q(a, .9)]); }
+  const hitArr = new Uint8Array(N), neg = new Uint8Array(N); let hit = 0, negc = 0;
+  for (let p = 0; p < N; p++) { if (s[p * W + gm] >= goal) { hitArr[p] = 1; hit++; } for (let m = 1; m <= gm; m++) if (s[p * W + m] < 0) { neg[p] = 1; negc++; break; } }
+  let need = null; for (let m = 1; m <= T; m++) { let c = 0; for (let p = 0; p < N; p++) if (s[p * W + m] >= goal) c++; if (c / N >= 0.7) { need = m; break; } }
+  const f36 = ENGINE.simulate(pr, P0, noise, N, 36, { policy: FIRST, bufferFirst: buf });
+  const f48 = ENGINE.simulate(pr, P0, noise, N, 48, { policy: FIRST, bufferFirst: buf });
+  const cnt = k => f36.flags[k].reduce((a, b) => a + b, 0);
+  const brk = cnt("brk1_gen") / N, causes = { sp: cnt("c1_sp"), un: cnt("c1_unemp"), sh: cnt("c1_shock"), de: cnt("c1_deficit") };
+  const match = f48.matchPaid.reduce((a, b) => a + b, 0) / N;
+  const det = ENGINE.simulate(pr, P0, ENGINE.zeroNoise(), 1, T, { collect: true, bufferFirst: buf }).saved;
+  return { band, prob: hit / N, hitArr, negProb: negc / N, need, brk, causes, match, det, eligible: r.eligible, gm, goal };
+}
+
+// ── 표시 도우미
+const fmtMan = v => { const neg = v < 0, a = Math.round(Math.abs(v)); const eok = Math.floor(a / 10000), man = a % 10000;
+  const s = eok ? `${eok}억${man ? " " + man.toLocaleString("ko-KR") + "만" : ""} 원` : `${man.toLocaleString("ko-KR")}만 원`; return (neg ? "−" : "") + s; };
+const pct = x => `${Math.round(x * 100)}%`, pp = x => `${x > 0 ? "+" : x < 0 ? "−" : ""}${Math.abs(Math.round(x * 1000) / 10)}%p`;
+const yrs = m => m % 12 === 0 ? `${m / 12}년` : `${Math.floor(m / 12)}년 ${m % 12}개월`;
+const WHY = {
+  prob: ["목표 달성 가능성", "같은 조건으로 계산한 미래 2,000개 중 목표 시점에 모은 돈이 목표 이상인 비율이에요. 실직(연령별 실업률, 경제활동인구조사), 급한 지출(청년도약계좌 해지율로 보정), 물가(소비자물가 2010~2025), 연봉(경력별 임금 통계)이 매달 무작위로 섞여요.", "계산 오차는 ±1%p 안팎이고, 가정에 따른 차이는 '범위 계산하기'로 볼 수 있어요."],
+  calc: ["계산기 결과", "실직·급전·물가·연봉 변동이 하나도 없다고 두고 계산한 값이에요. 일반 저축 계산기가 보여주는 숫자와 같은 방식이에요.", ""],
+  neg: ["빚을 질 가능성", "목표 시점까지 한 번이라도 통장이 마이너스(빚)로 내려가는 미래의 비율이에요. 마이너스 이자는 한국은행 2025년 일반신용대출 평균 5.31%로 계산해요.", "B등급 · 한국은행 가중평균금리"],
+  worst: ["최악의 경우", "미래 2,000개를 모은 돈 순서로 세웠을 때 아래에서 5% 지점이에요. 100명 중 가장 운이 나쁜 5명 정도의 결과예요.", ""],
+  brk: ["적금을 중도에 깰 가능성", "청년미래적금 첫 계좌 3년 동안, 마이너스가 '급할 때 버틸 금액'을 넘어서 일반해지하게 되는 비율이에요. 퇴직 후 6개월 안의 해지는 특별해지라 지원금이 남아서 여기서 빼요.", "A등급 · 우리은행 「우리 청년미래적금」 상품설명서 (중도해지 이율·재가입·특별중도해지)"],
+  match: ["받는 정부 지원금", "청년미래적금 첫 계좌에서 만기나 특별해지로 실제로 받은 정부 지원금(납입액의 6%, 월 최대 3만 원)의 평균이에요. 중간에 일반해지하면 0원이에요.", "A등급 · 상품설명서"],
+};
+document.addEventListener("click", e => { const b = e.target.closest(".why-btn"); if (!b) return; const [t, body, g] = WHY[b.dataset.why];
+  $("#whyT").textContent = t; $("#whyB").innerHTML = `<p>${body}</p>${g ? `<p class="grade">${g}</p>` : ""}`; $("#why").showModal(); });
+const whyBtn = k => `<button type="button" class="why-btn" data-why="${k}">근거</button>`;
+
+// ── 그래프
+let LAST = null; let rz = null; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => LAST && drawFan(...LAST), 150); });
+function drawFan(res, alt) {
+  LAST = [res, alt];
+  const svg = $("#fan"), W = Math.max(300, Math.round(svg.parentElement.clientWidth - 20)), H = W < 560 ? Math.round(W * 0.72) : 330, L = 54, R = 14, Tp = 16, B = 30, T = 120;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const det = Array.from(res.det), vals = res.band.flatMap(b => [b[0], b[3]]).concat(det, [res.goal, 0]);
+  if (alt) vals.push(...alt.band.map(b => b[2]));
+  let lo = Math.min(...vals), hi = Math.max(...vals); const pad = (hi - lo) * 0.06; lo -= pad; hi += pad;
+  const x = m => L + (W - L - R) * m / T, y = v => Tp + (H - Tp - B) * (1 - (v - lo) / (hi - lo));
+  const step = (() => { const r = (hi - lo) / 5, p = 10 ** Math.floor(Math.log10(r)); return [1, 2, 2.5, 5, 10].map(k => k * p).find(k => k >= r); })();
+  let g = "";
+  if (lo < 0) g += `<rect x="${L}" y="${y(0)}" width="${W - L - R}" height="${y(lo) - y(0)}" fill="var(--debt-soft)"/>`;
+  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+    g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="${v === 0 ? 1.2 : .7}"/>`;
+    g += `<text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${v === 0 ? "0" : (Math.abs(v) >= 10000 ? (v / 10000).toFixed(Math.abs(v) % 10000 ? 1 : 0) + "억" : v.toLocaleString("ko-KR") + "만")}</text>`;
+  }
+  for (let yy = 0; yy <= 10; yy += 1) if (yy % (W < 560 ? 2 : 2) === 0 || yy === 10) g += `<text x="${x(yy * 12)}" y="${H - 12}" text-anchor="middle">${yy === 0 ? "지금" : yy + "년"}</text>`;
+  const area = (i, j) => res.band.map((b, m) => `${x(m)},${y(b[i])}`).join(" ") + " " + res.band.map((b, m) => `${x(m)},${y(b[j])}`).reverse().join(" ");
+  g += `<polygon points="${area(1, 3)}" fill="var(--band-soft)"/>`;
+  g += `<polyline points="${res.band.map((b, m) => `${x(m)},${y(b[0])}`).join(" ")}" fill="none" stroke="var(--debt)" stroke-width="1" stroke-dasharray="2 3" opacity=".8"/>`;
+  g += `<polyline points="${det.map((v, m) => `${x(m)},${y(v)}`).join(" ")}" fill="none" stroke="var(--muted)" stroke-width="1.4" stroke-dasharray="6 5"/>`;
+  g += `<polyline points="${res.band.map((b, m) => `${x(m)},${y(b[2])}`).join(" ")}" fill="none" stroke="var(--median)" stroke-width="2.4"/>`;
+  if (alt) g += `<polyline points="${alt.band.map((b, m) => `${x(m)},${y(b[2])}`).join(" ")}" fill="none" stroke="var(--alt)" stroke-width="2.4"/>`;
+  const gm = alt ? alt.gm : res.gm;
+  g += `<line x1="${L}" x2="${W - R}" y1="${y(res.goal)}" y2="${y(res.goal)}" stroke="var(--ink)" stroke-width="1" stroke-dasharray="1 4"/>`;
+  g += `<text x="${W - R}" y="${y(res.goal) - 6}" text-anchor="end" style="fill:var(--ink)">목표 ${fmtMan(res.goal)}</text>`;
+  g += `<line x1="${x(gm)}" x2="${x(gm)}" y1="${Tp}" y2="${H - B}" stroke="var(--ink)" stroke-width="1" opacity=".35"/>`;
+  g += `<circle cx="${x(res.gm)}" cy="${y(res.band[res.gm][2])}" r="4" fill="var(--median)"/>`;
+  svg.innerHTML = g;
+  $("#legend").innerHTML = `<span><b style="background:var(--band-soft)"></b>10명 중 8명이 이 안</span><span><b style="background:var(--median);height:3px"></b>가운데</span>
+    <span><b style="border-top:1.5px dashed var(--muted);background:none;height:0"></b>계산기 결과</span><span><b style="border-top:1.5px dotted var(--debt);background:none;height:0"></b>최악의 경우</span>${alt ? `<span><b style="background:var(--alt);height:3px"></b>바꾼 계획</span>` : ""}`;
+}
+
+// ── 결과 그리기
+let BASE = null, PROFILE = null, INPUT = null;
+function render(o, res) {
+  const gm = res.gm;
+  $("#lead").innerHTML = `${o.goal_years}년 뒤 ${fmtMan(o.goal)}을 모을 가능성은 약 <span class="pct">${pct(res.prob)}</span>예요.${whyBtn("prob")}`;
+  const d = res.det[gm], med = res.band[gm][2];
+  $("#calc").innerHTML = `계산기로는 ${fmtMan(d)}이 나와요. 실직이나 급한 지출이 생기는 미래까지 넣으면 가운데 값은 ${fmtMan(med)}이에요.${whyBtn("calc")}`;
+  $("#rangeText").textContent = "이 확률은 가정에 따라 달라질 수 있어요.";
+  drawFan(res, null);
+  const cps = [12, 36, 60, 120].filter(m => m <= 120);
+  $("#cps").innerHTML = `<thead><tr><th></th>${cps.map(m => `<th>${m / 12}년 뒤</th>`).join("")}</tr></thead><tbody>
+    ${[["최악의 경우 (하위 5%)", 0], ["아래쪽 (하위 10%)", 1], ["가운데", 2], ["위쪽 (상위 10%)", 3]].map(([nm, i]) => `<tr><td>${nm}</td>${cps.map(m => { const v = res.band[m][i]; return `<td class="${v < 0 ? "neg" : ""}">${fmtMan(v)}</td>`; }).join("")}</tr>`).join("")}</tbody>`;
+  const c = res.causes, ct = c.sp + c.un + c.sh + c.de;
+  const seg = (v, col) => ct ? `<i style="width:${v / ct * 100}%;background:${col}"></i>` : "";
+  const elig = res.eligible;
+  $("#risks").innerHTML = `
+    <div class="risk"><div class="big ${res.negProb > .2 ? "neg" : ""}">${pct(res.negProb)}</div><div><div class="what">${o.goal_years}년 안에 한 번이라도 빚(마이너스)을 질 가능성${whyBtn("neg")}</div><div class="why">대부분 실직이나 급한 지출 직후에 생겨요.</div></div></div>
+    <div class="risk"><div class="big money ${res.band[gm][0] < 0 ? "neg" : ""}">${fmtMan(res.band[gm][0])}</div><div><div class="what">최악의 경우 ${o.goal_years}년 뒤 모은 돈${whyBtn("worst")}</div><div class="why">100명 중 가장 운이 나쁜 5명 정도의 결과예요.</div></div></div>
+    ${elig ? `<div class="risk"><div class="big">${pct(res.brk)}</div><div><div class="what">청년미래적금을 3년 안에 중도에 깰 가능성${whyBtn("brk")}</div>
+      <div class="cause">${seg(c.sh, "var(--debt)")}${seg(c.sp + c.un, "var(--band)")}${seg(c.de, "var(--alt)")}</div>
+      <div class="cause-legend"><span><b style="background:var(--debt)"></b>급한 지출 ${ct ? pct(c.sh / ct) : "0%"}</span><span><b style="background:var(--band)"></b>실직 ${ct ? pct((c.sp + c.un) / ct) : "0%"}</span><span><b style="background:var(--alt)"></b>매달 부족 ${ct ? pct(c.de / ct) : "0%"}</span></div>
+      <div class="why">실직 직후 6개월 안의 해지는 특별해지라 지원금이 남아요. 위 비율에는 해지한 사람의 원인이 모두 들어 있어요.</div></div></div>
+    <div class="risk"><div class="big money">${fmtMan(res.match)}</div><div><div class="what">첫 계좌에서 받는 정부 지원금 (평균)${whyBtn("match")}</div><div class="why">최대 108만 원이에요. 중간에 깨면 받지 못해요.</div></div></div>`
+    : `<div class="risk"><div class="big" style="font-size:16px">해당 없음</div><div><div class="what">청년미래적금 대상이 아니에요</div><div class="why">만 34세 이하, 총급여 7,500만 원 이하만 가입할 수 있어서 저축은 일반 적금(연 3.03%)으로 계산했어요.</div></div></div>`}`;
+}
+
+// ── 무엇을 바꾸면 좋을까 (같은 난수로 한 가지씩)
+const sleep = () => new Promise(r => setTimeout(r, 0));
+let job = 0;
+async function levers(o, base) {
+  const my = ++job, out = [], gm = base.gm;
+  const cand = [];
+  if (o.variable >= 10) cand.push({ act: "변동지출을 월 10만 원 줄이기", alt: { dVar: -10 } });
+  if (gm + 12 <= 120) cand.push({ act: "목표 시점을 1년 늦추기", gm: gm + 12 });
+  cand.push({ act: "목표 금액을 10% 낮추기", goal: Math.round(o.goal * 0.9) });
+  if (base.eligible && o.cash0 < 200) cand.push({ act: "비상금 200만 원을 먼저 모은 뒤 적금 시작", buf: 200 });
+  if (o.save >= 20) cand.push({ act: "월 저축액을 10만 원 줄이기", alt: { save: o.save - 10 } });
+  for (const c of cand) {
+    await sleep(); if (my !== job) return;
+    const r = run(toProfile(o, c.alt || {}), c.goal || o.goal, c.gm || gm, c.buf || 0);
+    out.push({ ...c, r, d: r.prob - base.prob });
+  }
+  out.sort((a, b) => b.d - a.d);
+  $("#levers").innerHTML = out.map(x => {
+    const flat = Math.abs(x.d) < 0.02, money = x.buf ? ` 3년 안에 적금을 깰 가능성은 ${pct(base.brk)} → ${pct(x.r.brk)}, 받는 지원금 차이는 평균 ${fmtMan(x.r.match - base.match)}이에요.` : "";
+    const save = x.alt && x.alt.save !== undefined ? " 저축하지 않은 돈은 통장에 남는다고 계산해서, 저축액만 바꾸면 결과가 거의 같아요. 결과를 바꾸는 건 쓰는 돈이에요." : "";
+    const when = (x.r.need && x.r.need !== base.need) ? `70% 가능성에 닿는 시점 ${base.need ? yrs(base.need) : "10년 넘게"} → ${yrs(x.r.need)}` : "";
+    return `<div class="lever"><div class="act">${x.act}</div><div class="eff ${flat ? "flat" : x.d > 0 ? "up" : ""}">${flat ? "거의 차이 없음" : `${pct(base.prob)} → ${pct(x.r.prob)}`}</div><div class="note">${when}${when && (money || save) ? ". " : ""}${money}${save}</div></div>`;
+  }).join("");
+  // 역산: 70%가 되려면
+  const rv = $("#reverse");
+  if (base.prob >= 0.7) { rv.hidden = false; rv.textContent = `지금 계획으로 이미 70% 이상이에요. 목표 시점보다 ${base.need && base.need < gm ? (gm - base.need) + "개월 일찍 닿을 가능성도 70%예요." : "조금 여유가 있어요."}`; return; }
+  let cut = null;
+  for (let k = 5; k <= Math.min(o.variable, 60); k += 5) {
+    await sleep(); if (my !== job) return;
+    const r = run(toProfile(o, { dVar: -k }), o.goal, gm); if (r.prob >= 0.7) { cut = k; break; }
+  }
+  const parts = []; if (cut) parts.push(`변동지출을 월 ${cut}만 원 줄이거나`); if (base.need) parts.push(`목표 시점을 ${yrs(base.need)} 뒤로 잡으면`);
+  rv.hidden = false;
+  rv.textContent = parts.length ? `가능성을 70%로 올리려면 ${parts.join(" ")} 돼요.` : "지출 조정만으로는 70%에 닿기 어려워요. 목표 금액을 낮추거나 기간을 10년 넘게 잡아야 해요.";
+}
+
+// ── 직접 바꿔보기
+const BUFS = [0, 100, 200, 300, 500];
+$("#c_buf").innerHTML = BUFS.map(b => `<button type="button" data-b="${b}" aria-pressed="${b === 0}">${b ? b + "만" : "안 함"}</button>`).join("");
+$("#c_events").innerHTML = Object.entries(PRESETS).map(([k, p]) => `<button type="button" class="chip" data-ev="${k}" aria-pressed="false">${p.label} 1년 뒤</button>`).join("");
+const altState = { dVar: 0, save: null, gm: null, buf: 0, ev: new Set() };
+function syncControls(o) {
+  altState.dVar = 0; altState.save = o.save; altState.gm = o.goal_years * 12; altState.buf = 0; altState.ev = new Set(o.events.map(e => e.id));
+  $("#c_var").value = 0; $("#c_save").value = o.save; $("#c_goal").value = altState.gm;
+  $$("#c_buf button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.b === 0));
+  $$("#c_events .chip").forEach(b => b.setAttribute("aria-pressed", altState.ev.has(b.dataset.ev)));
+  outputs();
+}
+function outputs() { $("#o_var").textContent = `${altState.dVar > 0 ? "+" : altState.dVar < 0 ? "−" : ""}${Math.abs(altState.dVar)}만 원`; $("#o_save").textContent = `${altState.save}만 원`; $("#o_goal").textContent = `${altState.gm / 12}년 뒤`; }
+$("#c_var").addEventListener("input", e => { altState.dVar = +e.target.value; outputs(); schedAlt(); });
+$("#c_save").addEventListener("input", e => { altState.save = +e.target.value; outputs(); schedAlt(); });
+$("#c_goal").addEventListener("input", e => { altState.gm = +e.target.value; outputs(); schedAlt(); });
+$("#c_buf").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; altState.buf = +b.dataset.b; $$("#c_buf button").forEach(x => x.setAttribute("aria-pressed", x === b)); schedAlt(); });
+$("#c_events").addEventListener("click", e => { const b = e.target.closest(".chip"); if (!b) return; const k = b.dataset.ev; altState.ev.has(k) ? altState.ev.delete(k) : altState.ev.add(k); b.setAttribute("aria-pressed", altState.ev.has(k)); schedAlt(); });
+let altTimer = null; const schedAlt = () => { clearTimeout(altTimer); altTimer = setTimeout(runAlt, 250); };
+function runAlt() {
+  if (!BASE) return; const o = INPUT;
+  const events = [...altState.ev].map(k => ({ id: k, y: (o.events.find(e => e.id === k) || { y: 1 }).y }));
+  const changed = altState.dVar !== 0 || altState.save !== o.save || altState.gm !== o.goal_years * 12 || altState.buf !== 0 || events.map(e => e.id).sort().join() !== o.events.map(e => e.id).sort().join();
+  if (!changed) { drawFan(BASE, null); $("#cmp").innerHTML = ""; $("#cmpNote").textContent = "위의 조절 막대나 버튼으로 계획을 바꿔 보세요."; return; }
+  const a = run(toProfile(o, { dVar: altState.dVar, save: altState.save, events }), o.goal, altState.gm, altState.buf);
+  drawFan(BASE, a);
+  // 짝지은 비교 (같은 난수): 통계적 유의 + 실용 기준 2%p
+  let s = 0, s2 = 0; for (let p = 0; p < N; p++) { const dd = a.hitArr[p] - BASE.hitArr[p]; s += dd; s2 += dd * dd; }
+  const md = s / N, sd = Math.sqrt(Math.max(s2 / N - md * md, 0) * N / (N - 1)), z = sd > 0 ? md / (sd / Math.sqrt(N)) : 0;
+  const meaningful = Math.abs(z) >= 1.96 && Math.abs(md) >= 0.02;
+  const rows = [
+    ["목표 달성 가능성", pct(BASE.prob), pct(a.prob), pp(a.prob - BASE.prob) + `<span class="tag ${meaningful ? "yes" : "no"}">${meaningful ? "의미 있는 차이" : "거의 차이 없음"}</span>`],
+    ["70% 가능성에 닿는 시점", BASE.need ? yrs(BASE.need) : "10년 넘게", a.need ? yrs(a.need) : "10년 넘게", ""],
+    ["빚을 질 가능성", pct(BASE.negProb), pct(a.negProb), pp(a.negProb - BASE.negProb)],
+    ["최악의 경우 (목표 시점)", fmtMan(BASE.band[BASE.gm][0]), fmtMan(a.band[a.gm][0]), ""],
+  ];
+  if (BASE.eligible) rows.push(["적금을 3년 안에 깰 가능성", pct(BASE.brk), pct(a.brk), pp(a.brk - BASE.brk)], ["받는 정부 지원금 (평균)", fmtMan(BASE.match), fmtMan(a.match), fmtMan(a.match - BASE.match).replace(/^(?!−)/, "+")]);
+  $("#cmp").innerHTML = `<thead><tr><th></th><th>지금 계획</th><th>바꾼 계획</th><th>차이</th></tr></thead><tbody>${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join("")}</tbody>`;
+  $("#cmpNote").textContent = "두 계획 모두 같은 2,000가지 미래로 계산해서, 차이는 오직 바꾼 내용에서 와요. 2%p보다 작은 차이는 '거의 차이 없음'으로 표시해요.";
+}
+
+// ── 범위 계산 (보고서 7.4의 결합 강건성을 축소해 실행)
+const QTAB = {"long|0.67|base": 0.09358, "long|0.67|buf3": 0.06386, "long|0.67|buf12": 0.1421, "long|0.67|spend": 0.06998, "long|1.0|base": 0.04817, "long|1.0|buf3": 0.03324, "long|1.0|buf12": 0.07747, "long|1.0|spend": 0.03681, "long|1.5|base": 0.02733, "long|1.5|buf3": 0.01914, "long|1.5|buf12": 0.04436, "long|1.5|spend": 0.02133, "short|0.67|base": 0.06882, "short|0.67|buf3": 0.03865, "short|0.67|buf12": 0.12156, "short|0.67|spend": 0.04469, "short|1.0|base": 0.03552, "short|1.0|buf3": 0.01997, "short|1.0|buf12": 0.06605, "short|1.0|spend": 0.02341, "short|1.5|base": 0.0202, "short|1.5|buf3": 0.01148, "short|1.5|buf12": 0.03809, "short|1.5|spend": 0.01358};
+$("#rangeBtn").addEventListener("click", async () => {
+  if (!BASE) return; const o = INPUT, pr = PROFILE, btn = $("#rangeBtn"), prog = $("#rangeProg"); btn.disabled = true; prog.hidden = false;
+  let st = 12345; const rnd = () => { st = (st + 0x6D2B79F5) | 0; let t = Math.imul(st ^ (st >>> 15), 1 | st); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const U = (a, b) => a + (b - a) * rnd(), pickOne = arr => arr[Math.floor(rnd() * arr.length) % arr.length];
+  const K = 40, M = 500, probs = [];
+  for (let j = 0; j < K; j++) {
+    await sleep();
+    const p = ENGINE.clone(P0);
+    Object.assign(p.inflation, { mu_y: U(.0138, .0278), sigma_y: U(.0097, .0204), phi: U(.1, .9) });
+    Object.assign(p.wage, { macro_mu: U(.018, .038), idio_sd: U(.006, .147), rho_macro: U(.21, .87) }); p.wage.exp_prem = [0.0652, 0.0515, 0.0445, U(.0367, .0401)];
+    const sc = U(.78, 1); p.unemp.u_by_age = P0.unemp.u_by_age.map(x => x * sc);
+    const stc = pickOne(["long", "short"]), am = pickOne(["0.67", "1.0", "1.5"]), pv = pickOne(["base", "buf3", "buf12", "spend"]), amf = parseFloat(am);
+    p.unemp.exit_m = stc === "long" ? 0.092 : 0.241; p.shock.amounts = [[120 * amf, .7], [300 * amf, .3]]; p.shock.prob_m = QTAB[`${stc}|${am}|${pv}`];
+    Object.assign(p.unemp, { invol_share: U(.2, .35), scar_per_year: U(.03, .1) }); p.spend.raise_share = U(.24, .5);
+    const r = ENGINE.simulate(pr, p, ENGINE.randomNoise(900 + j, M), M, BASE.gm, { collect: true });
+    let h = 0; for (let k = 0; k < M; k++) if (r.saved[k * (BASE.gm + 1) + BASE.gm] >= o.goal) h++;
+    probs.push(h / M); prog.firstElementChild.style.width = `${(j + 1) / K * 100}%`;
+  }
+  probs.sort((a, b) => a - b);
+  const lo = probs[1], hi = probs[K - 2];
+  $("#rangeText").innerHTML = `가정을 40가지로 바꿔 다시 계산하면 대부분 <b>${pct(lo)}~${pct(hi)}</b> 사이예요. 정확한 한 숫자보다 이 범위를 봐 주세요.`;
+  btn.disabled = false; prog.hidden = true; prog.firstElementChild.style.width = "0";
+});
+
+// ── 파라미터 표 (보고서 5.2 요약)
+$("#params").innerHTML = `<thead><tr><th>무엇</th><th>값</th><th>등급</th><th>어디서</th></tr></thead><tbody>${[
+  ["연령별 실업률", "20~24세 8.8%, 25~29세 7.4%, 30~34세 3.7%, 35~39세 2.5%", "B", "경제활동인구조사 2016~2025"],
+  ["실직 후 다시 일할 확률", "매달 9.2% (평균 11개월)", "C", "국회예산정책처 NABO Focus 157호"],
+  ["실업급여", "월 198~204만 원, 근무 기간에 따라 4~8개월", "A", "고용보험법"],
+  ["연봉 인상", "모두 함께 2.85% + 경력에 따라 4.0~6.5%", "B", "고용형태별근로실태조사"],
+  ["개인별 연봉 차이", "연 11.5%", "C", "임금근로일자리 소득 통계"],
+  ["물가", "연 2.08% (전년 영향 0.55)", "B", "소비자물가 2010~2025"],
+  ["급한 지출", "월 4.82% 확률, 120만 원(70%)·300만 원(30%), 물가 반영", "D·E", "청년도약계좌 해지율로 보정, 청년희망적금으로 검증"],
+  ["소득이 오를 때 지출도 오르는 비율", "늘어난 소득의 45%", "C", "가계금융복지조사 한계소비성향"],
+  ["실직 중 지출 감소", "실업급여 받으면 6.8%, 못 받으면 22%", "C", "Gruber (1997)"],
+  ["청년미래적금", "월 50만 원 한도, 3년, 연 5.0% 단리(입금한 날부터), 지원금 6%", "A", "우리은행 상품설명서"],
+  ["통장·일반 적금·마이너스 금리", "연 0.68% · 3.03%(직접 고칠 수 있음, 1년마다 세후 이자 재예치) · 5.31%", "B", "한국은행 2025년 평균"],
+].map(r => `<tr><td>${r[0]}</td><td style="white-space:normal;text-align:left">${r[1]}</td><td>${r[2]}</td><td style="white-space:normal;text-align:left">${r[3]}</td></tr>`).join("")}</tbody>`;
+
+// ── 흐름
+function recompute() {
+  const o = readForm(); const { E, W } = validate(o);
+  const sur = o.net_income - o.fixed - o.variable - loanPay(o);
+  const lp = loanPay(o);
+  $("#surplus").textContent = Number.isFinite(sur) ? `매달 남는 돈 ${fmtMan(sur)}${lp > 0 ? ` (대출 상환 월 ${fmtMan(lp)} 뺀 금액)` : ""}` : "";
+  $("#msg").innerHTML = [...E.map(x => `<div class="err">${x}</div>`), ...W.map(x => `<div class="warn">${x}</div>`)].join("");
+  if (E.length) { $("#results").classList.add("busy"); return; }
+  try { localStorage.setItem("sim_input_v2", JSON.stringify(o)); } catch (e) {}
+  $("#results").classList.add("busy");
+  setTimeout(() => {
+    INPUT = o; PROFILE = toProfile(o);
+    BASE = run(PROFILE, o.goal, o.goal_years * 12);
+    render(o, BASE); syncControls(o); $("#cmp").innerHTML = ""; $("#cmpNote").textContent = "위의 조절 막대나 버튼으로 계획을 바꿔 보세요.";
+    $("#results").classList.remove("busy");
+    $("#levers").innerHTML = `<p class="small">계산하는 중이에요</p>`; $("#reverse").hidden = true;
+    levers(o, BASE);
+  }, 20);
+}
+let tmr = null; form.addEventListener("input", () => { clearTimeout(tmr); tmr = setTimeout(recompute, 350); }); form.addEventListener("change", () => { clearTimeout(tmr); tmr = setTimeout(recompute, 150); });
+$$(".examples .chip").forEach(b => b.addEventListener("click", () => { $$(".examples .chip").forEach(x => x.setAttribute("aria-pressed", x === b)); writeForm(EX[b.dataset.ex]); recompute(); }));
+$("#clearSaved").addEventListener("click", () => { try { localStorage.removeItem("sim_input_v2"); localStorage.removeItem("sim_input_v1"); } catch (e) {} writeForm(EX.s1); recompute(); });
+let init = EX.s1;
+try {
+  const s2 = JSON.parse(localStorage.getItem("sim_input_v2") || "null"), s1 = JSON.parse(localStorage.getItem("sim_input_v1") || "null");
+  if (s2 && s2.age) init = { general_rate: 3.03, ...s2 };
+  else if (s1 && s1.age) init = { ...s1, hasLoan: s1.loan_balance > 0, loans: s1.loan_balance > 0 ? [{ kind: "기타", balance: s1.loan_balance, rate: s1.loan_rate, months: s1.loan_months, method: s1.loan_method }] : [] };
+} catch (e) {}
+writeForm(init); if (init === EX.s1) $(".examples .chip").setAttribute("aria-pressed", "true");
+recompute();
+})();
+</script>
+</body>
+</html>
