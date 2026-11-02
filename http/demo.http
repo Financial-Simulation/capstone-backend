@@ -1,0 +1,107 @@
+### 발표 데모용 요청 모음 (페르소나 S1 · 27세 개발자)
+### docs/tasks/presentation-demo/plan.md 의 데모 대본 순서와 같다.
+### 서버를 먼저 켜 두고(./gradlew bootRun) 위에서부터 차례로 누른다.
+
+@host = http://localhost:8080
+
+### 0. 예시 사용자 S1~S3 (04-E 예시 모드에서 쓰는 입력)
+GET {{host}}/api/examples
+
+### 1. 01-1 나와 소득/지출 — 월 여유자금 60만 원
+POST {{host}}/api/inputs/validate
+Content-Type: application/json
+
+{
+  "step": "BASIC",
+  "input": {
+    "startMonth": "2026-11",
+    "person": { "age": 27, "careerYears": 2, "employmentType": "REGULAR" },
+    "income": { "monthlyNetIncome": 2500000 },
+    "expenses": {
+      "fixed": { "inputMode": "TOTAL", "items": [], "total": 950000 },
+      "variable": { "inputMode": "TOTAL", "items": [], "total": 950000 }
+    }
+  }
+}
+
+### 2. 01-1 오류 상태 — 나이 17살 (COMMON400 + "person.age")
+POST {{host}}/api/inputs/validate
+Content-Type: application/json
+
+{
+  "step": "BASIC",
+  "input": {
+    "startMonth": "2026-11",
+    "person": { "age": 17, "careerYears": 0, "employmentType": "REGULAR" },
+    "income": { "monthlyNetIncome": 2500000 },
+    "expenses": {
+      "fixed": { "inputMode": "TOTAL", "items": [], "total": 950000 },
+      "variable": { "inputMode": "TOTAL", "items": [], "total": 950000 }
+    }
+  }
+}
+
+### 3. 01-2 대출별 월 상환액 — 학자금 1,200만 · 1.9% · 96개월 (134,839원)
+POST {{host}}/api/loans/repayment-preview
+Content-Type: application/json
+
+{
+  "loanType": "STUDENT",
+  "principal": 12000000,
+  "annualRate": 1.9,
+  "remainingMonths": 96,
+  "repaymentType": "EQUAL_PAYMENT"
+}
+
+### 4. 01-2 '다음' — 경고 모달 "매달 ○○만 원이 모자라요" (WARN_MONTHLY_SHORTFALL)
+POST {{host}}/api/inputs/validate
+Content-Type: application/json
+
+{
+  "step": "ASSETS",
+  "input": {
+    "startMonth": "2026-11",
+    "person": { "age": 27, "careerYears": 2, "employmentType": "REGULAR" },
+    "income": { "monthlyNetIncome": 2500000 },
+    "expenses": {
+      "fixed": { "inputMode": "TOTAL", "items": [], "total": 950000 },
+      "variable": { "inputMode": "TOTAL", "items": [], "total": 950000 }
+    },
+    "assets": { "cash": 2000000, "deposits": 0, "investments": 0 },
+    "savingPlan": { "monthlySaving": 500000, "generalSavingRate": 3.03, "monthlyInvestment": 0, "emergencyFirstAmount": 0 },
+    "emergency": { "breakThreshold": 500000 },
+    "loans": { "hasNoLoan": false, "items": [
+      { "name": "학자금대출", "loanType": "STUDENT", "principal": 12000000,
+        "annualRate": 1.9, "remainingMonths": 96, "repaymentType": "EQUAL_PAYMENT" } ] }
+  }
+}
+
+### 5. 03 시나리오 선택 — 예정된 일 프리셋 5종
+GET {{host}}/api/events/presets
+
+### 6. 03 '결과 보기' 직전 — 전체 입력 검사 (S1 전체)
+POST {{host}}/api/inputs/validate
+Content-Type: application/json
+
+{
+  "step": "ALL",
+  "input": {
+    "startMonth": "2026-11",
+    "person": { "age": 27, "careerYears": 2, "employmentType": "REGULAR" },
+    "income": { "monthlyNetIncome": 2500000 },
+    "expenses": {
+      "fixed": { "inputMode": "TOTAL", "items": [], "total": 950000 },
+      "variable": { "inputMode": "TOTAL", "items": [], "total": 950000 }
+    },
+    "assets": { "cash": 2000000, "deposits": 0, "investments": 0 },
+    "savingPlan": { "monthlySaving": 500000, "generalSavingRate": 3.03, "monthlyInvestment": 0, "emergencyFirstAmount": 0 },
+    "emergency": { "breakThreshold": 500000 },
+    "loans": { "hasNoLoan": false, "items": [
+      { "name": "학자금대출", "loanType": "STUDENT", "principal": 12000000,
+        "annualRate": 1.9, "remainingMonths": 96, "repaymentType": "EQUAL_PAYMENT" } ] },
+    "goal": { "name": "5년 뒤 3,000만 원", "targetAmount": 30000000, "targetDate": "2031-11" },
+    "events": []
+  }
+}
+
+### 7~9. 엔진 구현 후 추가: POST /api/simulate → POST /api/simulate/preview (변동지출 95만 → 80만) → POST /api/robust
