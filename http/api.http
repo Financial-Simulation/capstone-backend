@@ -86,3 +86,46 @@ Content-Type: application/json
 
 ### 7. 예시 사용자 S1~S3
 GET {{host}}/api/examples
+
+
+### 아래 계산 요청이 함께 쓰는 입력 (예시 사용자 S1)
+@s1 = {"startMonth":"2026-11","person":{"age":27,"careerYears":2,"employmentType":"REGULAR"},"income":{"monthlyNetIncome":2500000},"expenses":{"fixed":{"inputMode":"TOTAL","items":[],"total":950000},"variable":{"inputMode":"TOTAL","items":[],"total":950000}},"assets":{"cash":2000000,"deposits":0,"investments":0},"savingPlan":{"monthlySaving":500000,"generalSavingRate":3.03,"monthlyInvestment":0,"emergencyFirstAmount":0},"emergency":{"breakThreshold":500000},"loans":{"hasNoLoan":false,"items":[{"name":"학자금대출","loanType":"STUDENT","principal":12000000,"annualRate":1.9,"remainingMonths":96,"repaymentType":"EQUAL_PAYMENT"}]},"goal":{"name":"5년 뒤 3,000만 원","targetAmount":30000000,"targetDate":"2031-11"},"events":[]}
+
+### 8. 근거·파라미터
+GET {{host}}/api/meta
+
+### 9. 시뮬레이션 (S1: 58.0%, 확정 44,396,264원)
+POST {{host}}/api/simulate
+Content-Type: application/json
+
+{ "input": {{s1}}, "seed": null }
+
+### 10. 바꿔 보기 (변동지출 10만 원 줄이기: 70.5%, z 16.86)
+POST {{host}}/api/simulate/preview
+Content-Type: application/json
+
+{ "input": {{s1}}, "adjustments": { "monthlyVariableExpense": 850000 } }
+
+### 11. 계획 비교
+POST {{host}}/api/compare
+Content-Type: application/json
+
+{ "input": {{s1}}, "plans": [
+  { "name": "변동지출 10만 원 줄이기", "adjustments": { "monthlyVariableExpense": 850000 } },
+  { "name": "비상금 300만 원 먼저", "adjustments": { "emergencyFirstAmount": 3000000 } }
+] }
+
+### 12. 역산과 개선 포인트
+POST {{host}}/api/reverse
+Content-Type: application/json
+
+{ "input": {{s1}}, "targetProbability": 70.0 }
+
+### 13. 가능성 범위 시작 (202, 응답의 jobId로 아래를 조회)
+POST {{host}}/api/robust
+Content-Type: application/json
+
+{ "input": {{s1}} }
+
+### 14. 가능성 범위 결과
+GET {{host}}/api/robust/rb-여기에-jobId
