@@ -4,6 +4,7 @@ import com.example.capstoneserver.global.response.ApiResponse;
 import com.example.capstoneserver.simulation.dto.CompareResponse;
 import com.example.capstoneserver.simulation.dto.MetaResponse;
 import com.example.capstoneserver.simulation.dto.PreviewResponse;
+import com.example.capstoneserver.simulation.dto.RecommendResponse;
 import com.example.capstoneserver.simulation.dto.ReverseResponse;
 import com.example.capstoneserver.simulation.dto.RobustResponse;
 import com.example.capstoneserver.simulation.dto.SimulateResponse;
@@ -57,6 +58,11 @@ public class SimulationController {
     @GetMapping("/robust/{jobId}")
     public ApiResponse<RobustResponse> robustResult(@PathVariable String jobId) {
         return ApiResponse.onSuccess(robustJobService.get(jobId));
+    }
+
+    @PostMapping("/allocations/recommend")
+    public ApiResponse<RecommendResponse> recommend(@Valid @RequestBody SimulationRequests.Recommend request) {
+        return ApiResponse.onSuccess(simulationService.recommend(request.input(), null));
     }
 
     @GetMapping("/meta")

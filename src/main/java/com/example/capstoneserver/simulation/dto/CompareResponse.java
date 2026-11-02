@@ -19,6 +19,9 @@ public record CompareResponse(long seed, int goalMonths, List<Plan> plans) {
             long worstCaseAtGoal,
             BigDecimal earlyTerminationProbability,
             Long expectedSubsidy,
-            List<Long> yearlyP50
+            List<Long> yearlyP50,
+            long medianAtGoal,
+            long taxNetBenefit,
+            Allocation allocation
     ) {}
 }

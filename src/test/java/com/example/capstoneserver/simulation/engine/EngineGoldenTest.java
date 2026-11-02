@@ -7,6 +7,7 @@ import com.example.capstoneserver.input.dto.SimulationInput.EmploymentType;
 import com.example.capstoneserver.loan.LoanCalculator;
 import com.example.capstoneserver.simulation.ParamsRepository;
 import com.example.capstoneserver.simulation.engine.EngineResult.Flag;
+import com.example.capstoneserver.simulation.engine.EngineResult.TaxItem;
 import com.example.capstoneserver.simulation.engine.NoiseSource.PathNoise;
 import java.io.IOException;
 import java.io.InputStream;
@@ -21,7 +22,8 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * 구현 명세서 8.1, 8.2: 파이썬 기준 구현의 난수를 그대로 넣어 결과가 같은지 본다.
- * 통과 기준: saved·det·match 상대오차 1e-9 이하, 플래그·첫 해지 시점 완전 일치.
+ * 통과 기준: saved·det·match·세금 상대오차 1e-9 이하, 플래그·첫 해지 시점 완전 일치.
+ * 16개 프로필 = v1.6 12개 + 세금 모듈 4개 (월세·청약·연금, 주택드림 비과세, 기여금 6,000만 초과, 유주택·연금 깨기).
  * 정답 파일은 기준 저장소 engine/golden.json을 복사한 것.
  */
 class EngineGoldenTest {
@@ -34,7 +36,11 @@ class EngineGoldenTest {
             Map.entry("brkG", Flag.BRK_G), Map.entry("mature1", Flag.MATURE1),
             Map.entry("limit", Flag.LIMIT), Map.entry("rejoin", Flag.REJOIN),
             Map.entry("c1_sp", Flag.C1_SP), Map.entry("c1_unemp", Flag.C1_UNEMP),
-            Map.entry("c1_shock", Flag.C1_SHOCK), Map.entry("c1_deficit", Flag.C1_DEFICIT));
+            Map.entry("c1_shock", Flag.C1_SHOCK), Map.entry("c1_deficit", Flag.C1_DEFICIT),
+            Map.entry("brkH", Flag.BRK_H), Map.entry("brkPen", Flag.BRK_PEN));
+    private static final Map<String, TaxItem> TAX_KEYS = Map.of(
+            "refund", TaxItem.REFUND, "interest_tax", TaxItem.INTEREST_TAX,
+            "clawback", TaxItem.CLAWBACK, "pension_tax", TaxItem.PENSION_TAX);
 
     private static JsonNode golden;
     private static EngineParams params;
@@ -49,13 +55,13 @@ class EngineGoldenTest {
     }
 
     @Test
-    void 파이썬_기준_구현과_12개_프로필이_모두_일치한다() {
+    void 파이썬_기준_구현과_16개_프로필이_모두_일치한다() {
         int n = golden.get("N").asInt();
         int t = golden.get("T").asInt();
         NoiseSource noise = fileNoise(golden.get("noise"));
         double worst = 0;
 
-        assertThat(golden.get("cases").size()).isEqualTo(12);
+        assertThat(golden.get("cases").size()).isEqualTo(16);
         for (JsonNode c : golden.get("cases")) {
             String name = c.get("name").asString();
             EngineProfile pr = profile(c.get("pr"));
@@ -71,6 +77,10 @@ class EngineGoldenTest {
                     worst = Math.max(worst, relErr(r.at(path, m), c.get("saved").get(path).get(m).asDouble(), name));
                 }
                 worst = Math.max(worst, relErr(r.matchPaid()[path], c.get("match").get(path).asDouble(), name));
+                for (Map.Entry<String, TaxItem> item : TAX_KEYS.entrySet()) {
+                    worst = Math.max(worst, relErr(r.tax()[item.getValue().ordinal()][path],
+                            c.get("tax").get(item.getKey()).get(path).asDouble(), name + " " + item.getKey()));
+                }
                 assertThat(r.firstBrk()[path]).as("%s 경로 %d 첫 해지", name, path).isEqualTo(c.get("firstBrk").get(path).asInt());
                 for (Map.Entry<String, Flag> flag : FLAG_KEYS.entrySet()) {
                     assertThat((int) r.flags()[flag.getValue().ordinal()][path])
@@ -157,7 +167,14 @@ class EngineGoldenTest {
                 pr.has("general_rate") ? pr.get("general_rate").asDouble() : null,
                 pr.has("thr") ? pr.get("thr").asDouble() : 50,
                 loans,
-                events);
+                events,
+                pr.has("gross_y") ? pr.get("gross_y").asDouble() : null,
+                pr.has("rent") ? pr.get("rent").asDouble() : 0,
+                !pr.has("homeless") || pr.get("homeless").asBoolean(),
+                pr.has("start_month") ? pr.get("start_month").asInt() : 1,
+                pr.has("policy_m") ? pr.get("policy_m").asDouble() : null,
+                pr.has("housing_m") ? pr.get("housing_m").asDouble() : 0,
+                pr.has("pension_m") ? pr.get("pension_m").asDouble() : 0);
     }
 
     private static RepaymentType method(String method) {

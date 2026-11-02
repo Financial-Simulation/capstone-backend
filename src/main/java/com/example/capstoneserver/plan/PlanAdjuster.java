@@ -36,12 +36,13 @@ public class PlanAdjuster {
 
         Income income = adj.monthlyNetIncome() == null
                 ? input.income()
-                : new Income(adj.monthlyNetIncome());
+                : new Income(adj.monthlyNetIncome(), input.income().annualGrossSalary());
 
         // 지출은 조정하면 입력 방식(DETAIL/TOTAL)과 상관없이 합계로 덮어쓴다
         Expenses expenses = new Expenses(
                 adj.monthlyFixedExpense() == null ? input.expenses().fixed() : totalOnly(adj.monthlyFixedExpense()),
-                adj.monthlyVariableExpense() == null ? input.expenses().variable() : totalOnly(adj.monthlyVariableExpense())
+                adj.monthlyVariableExpense() == null ? input.expenses().variable() : totalOnly(adj.monthlyVariableExpense()),
+                input.expenses().monthlyRent()
         );
 
         SavingPlan sp = input.savingPlan();
@@ -49,7 +50,10 @@ public class PlanAdjuster {
                 pick(adj.monthlySaving(), sp.monthlySaving()),
                 sp.generalSavingRate(),
                 pick(adj.monthlyInvestment(), sp.monthlyInvestment()),
-                pick(adj.emergencyFirstAmount(), sp.emergencyFirstAmount())
+                pick(adj.emergencyFirstAmount(), sp.emergencyFirstAmount()),
+                pick(adj.policyMonthly(), sp.policyMonthly()),
+                pick(adj.housingMonthly(), sp.housingMonthly()),
+                pick(adj.pensionMonthly(), sp.pensionMonthly())
         );
 
         Emergency emergency = new Emergency(pick(adj.breakThreshold(), input.emergency().breakThreshold()));
@@ -91,6 +95,12 @@ public class PlanAdjuster {
                 before.savingPlan().monthlyInvestment(), after.savingPlan().monthlyInvestment());
         money(changes, "emergencyFirstAmount", "비상금 먼저 모으기",
                 before.savingPlan().emergencyFirstAmount(), after.savingPlan().emergencyFirstAmount());
+        money(changes, "policyMonthly", "청년미래적금 월 납입",
+                before.savingPlan().policyMonthly(), after.savingPlan().policyMonthly());
+        money(changes, "housingMonthly", "주택청약 월 납입",
+                before.savingPlan().housingMonthly(), after.savingPlan().housingMonthly());
+        money(changes, "pensionMonthly", "연금저축 월 납입",
+                before.savingPlan().pensionMonthly(), after.savingPlan().pensionMonthly());
         money(changes, "breakThreshold", "버틸 금액",
                 before.emergency().breakThreshold(), after.emergency().breakThreshold());
         money(changes, "goalTargetAmount", "목표 금액",
@@ -114,7 +124,7 @@ public class PlanAdjuster {
 
     private void money(List<Change> changes, String field, String label, Long before, Long after) {
         if (!Objects.equals(before, after)) {
-            changes.add(new Change(field, label, before, after, after - before));
+            changes.add(new Change(field, label, before, after, (after == null ? 0 : after) - (before == null ? 0 : before)));   // 배분 칸은 비어 있을 수 있음
         }
     }
 

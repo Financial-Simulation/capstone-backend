@@ -17,6 +17,7 @@ public record SimulateResponse(
         List<Band> bands,
         Risks risks,
         Causes causes,
+        Tax tax,
         List<EventMarker> eventMarkers,
         List<Warning> warnings
 ) {
@@ -58,4 +59,12 @@ public record SimulateResponse(
     public record CauseCounts(int unemployment, int prolongedUnemployment, int emergencyExpense, int chronicDeficit) {}
 
     public record EventMarker(String name, String month) {}
+
+    /**
+     * 세금 (목표 시점까지 2,000개 미래의 평균, 원).
+     * refund는 청약·연금저축·월세가 없을 때와 비교해 돌려받는 세금, netBenefit = refundTotal − interestTax − clawback − pensionTax.
+     * 해지 확률은 그 상품이 없으면 null.
+     */
+    public record Tax(long refundTotal, long refundPerYear, long interestTax, long clawback, long pensionTax, long netBenefit,
+                      BigDecimal housingBreakProbability, BigDecimal pensionBreakProbability, Allocation allocation) {}
 }

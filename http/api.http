@@ -129,3 +129,24 @@ Content-Type: application/json
 
 ### 14. 가능성 범위 결과
 GET {{host}}/api/robust/rb-여기에-jobId
+
+
+### 15. 세금 반영 입력 (세전 연봉·월세·청약·연금저축을 넣은 S1) - 응답 tax 블록 확인
+POST {{host}}/api/simulate
+Content-Type: application/json
+
+{ "input": {"startMonth":"2026-11","person":{"age":27,"careerYears":2,"employmentType":"REGULAR","homelessHouseholder":true},"income":{"monthlyNetIncome":2500000,"annualGrossSalary":34000000},"expenses":{"fixed":{"inputMode":"TOTAL","items":[],"total":950000},"variable":{"inputMode":"TOTAL","items":[],"total":950000},"monthlyRent":400000},"assets":{"cash":2000000,"deposits":0,"investments":0},"savingPlan":{"monthlySaving":500000,"generalSavingRate":3.03,"monthlyInvestment":0,"emergencyFirstAmount":0,"policyMonthly":100000,"housingMonthly":250000,"pensionMonthly":100000},"emergency":{"breakThreshold":500000},"loans":{"hasNoLoan":false,"items":[{"name":"학자금대출","loanType":"STUDENT","principal":12000000,"annualRate":1.9,"remainingMonths":96,"repaymentType":"EQUAL_PAYMENT"}]},"goal":{"name":"5년 뒤 3,000만 원","targetAmount":30000000,"targetDate":"2031-11"},"events":[]} }
+
+### 16. 자산 쪼개기 추천 (S1: 지금 58.0%, 달성 최대 배분 58.9%)
+POST {{host}}/api/allocations/recommend
+Content-Type: application/json
+
+{ "input": {{s1}} }
+
+### 17. 리포트 데이터 (simulate·reverse·compare를 한 번에 묶음)
+POST {{host}}/api/reports
+Content-Type: application/json
+
+{ "input": {{s1}}, "plans": [
+  { "name": "변동지출 10만 원 줄이기", "adjustments": { "monthlyVariableExpense": 850000 } }
+] }

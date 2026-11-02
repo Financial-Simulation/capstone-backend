@@ -1,7 +1,7 @@
 {
  "schemaVersion": 1,
- "modelVersion": "1.6",
- "builtFrom": "reference_python/kernel.py v1.6 (값), 설계 보고서 5.2·5.3·9.1 (근거)",
+ "modelVersion": "1.7",
+ "builtFrom": "reference_python/kernel.py v1.7·tax.py (값), 설계 보고서 5.2·5.3·9.1, 세금 모듈 명세 (근거)",
  "units": "금액 만 원, 금리·비율 연 소수, 기간 개월 (구현 명세서 0장)",
  "simulation": {
   "defaultSeed": 20261007,
@@ -130,6 +130,7 @@
   "tax": 0.154,
   "age_max": 34,
   "gross_max_y": 7500.0,
+  "match_gross_max_y": 6000.0,
   "rejoin_wait": 2,
   "rejoin": true,
   "early_table": [
@@ -157,6 +158,50 @@
   "rate": 0.0303,
   "early_ratio": 0.5,
   "tax": 0.154
+ },
+ "housing": {
+  "edges": [
+   1,
+   12,
+   24
+  ],
+  "rates": [
+   0.0,
+   0.023,
+   0.028,
+   0.031
+  ],
+  "dream_rates": [
+   0.0,
+   0.037,
+   0.042,
+   0.045
+  ],
+  "dream_age": 34,
+  "dream_gross_y": 5000.0,
+  "dream_principal_cap": 5000.0,
+  "taxfree_gross_y": 3600.0,
+  "taxfree_months": 24,
+  "taxfree_interest": 500.0,
+  "tax": 0.154,
+  "claw_rate": 0.066,
+  "claw_cap_y": 300.0,
+  "claw_months": 60
+ },
+ "pension": {
+  "credit_cap_y": 600.0,
+  "early_tax": 0.165
+ },
+ "taxRules": {
+  "insurance": {
+   "nps": 0.0475,
+   "health": 0.03595,
+   "ltc": 0.13140472878998607,
+   "employ": 0.009,
+   "npsCap": 6590000,
+   "npsFloor": 410000
+  },
+  "verifiedBy": "홈택스 2026년 귀속 연말정산 자동계산 24개 사례 결정세액 원 단위 일치 (2026-10-31)"
  },
  "loanDefaults": {
   "STUDENT": {
@@ -468,6 +513,50 @@
     ]
    },
    {
+    "key": "youthFutureMatchIncome",
+    "label": "청년미래적금 정부기여금 소득 기준",
+    "value": "총급여 6,000만 원 이하 (가입은 7,500만 원 이하)",
+    "grade": "A",
+    "source": "우리은행 「우리 청년미래적금」 상품설명서 (심의필 2026-9182)",
+    "asOf": "2026.10",
+    "paths": [
+     "policy.match_gross_max_y"
+    ]
+   },
+   {
+    "key": "housingSubscription",
+    "label": "주택청약",
+    "value": "해지 시 가입기간 이율을 전체 입금에 적용 (2.3~3.1%, 청년 주택드림 3.7~4.5%), 5년 안 해지 추징 6.6%",
+    "grade": "A",
+    "source": "하나·농협 주택청약종합저축 상품설명서(2026.3), 신한 청년 주택드림 상품설명서(2025.12), 국세청 연말정산 신고안내 p.122~123",
+    "asOf": "2026.10",
+    "paths": [
+     "housing"
+    ]
+   },
+   {
+    "key": "pensionSaving",
+    "label": "연금저축",
+    "value": "세액공제 연 600만 원 한도 15%(총급여 5,500만 초과 12%), 55세 전 인출 16.5%",
+    "grade": "A",
+    "source": "소득세법 §59의3, 국세청 연말정산 신고안내 p.164~165",
+    "asOf": "2026",
+    "paths": [
+     "pension"
+    ]
+   },
+   {
+    "key": "yearEndTax",
+    "label": "연말정산 (근로소득세)",
+    "value": "근로소득공제·기본세율·근로소득세액공제·청약 소득공제·월세 세액공제·표준세액공제, 홈택스 모의계산 24개와 원 단위 일치",
+    "grade": "A",
+    "source": "국세청 「2025년 원천징수의무자를 위한 연말정산 신고안내」, 「2026년 개정세법(연말정산)」, 4대보험 요율(보건복지부·위원회 의결)",
+    "asOf": "2026 귀속",
+    "paths": [
+     "taxRules"
+    ]
+   },
+   {
     "key": "rates",
     "label": "통장·일반 적금·마이너스 금리",
     "value": "연 0.68% · 3.03% · 5.31%",
@@ -508,7 +597,8 @@
    }
   },
   "validation": {
-   "golden": "같은 난수를 넣으면 파이썬 기준 구현과 1조분의 1 이내 일치 (JS 시제품, 12개 프로필)",
+   "golden": "같은 난수를 넣으면 파이썬 기준 구현과 1조분의 1 이내 일치 (JS 시제품·Java 백엔드, 16개 프로필)",
+   "tax": "연말정산 결정세액이 홈택스 모의계산 24개 사례와 원 단위 일치 (2026-10-31)",
    "backtest": "청년희망적금 3개 시점 실제 해지율과 차이 0.6~0.9%p",
    "robustness": "가정 60가지 변경에도 비교 결론 60번 유지"
   }

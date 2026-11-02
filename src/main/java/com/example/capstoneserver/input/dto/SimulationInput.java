@@ -74,10 +74,13 @@ public record SimulationInput(
             @Max(value = 10, message = "0~10년 사이로 입력해 주세요")
             Integer careerYears,
 
-            EmploymentType employmentType
+            EmploymentType employmentType,
+
+            Boolean homelessHouseholder      // 무주택 세대주 (선택, 기본 예). 청약 소득공제·월세 세액공제·주택드림 비과세 조건
     ) {
         public Person {
             if (employmentType == null) employmentType = EmploymentType.REGULAR;
+            if (homelessHouseholder == null) homelessHouseholder = Boolean.TRUE;
         }
     }
 
@@ -87,16 +90,41 @@ public record SimulationInput(
             @NotNull(groups = InputStep.Basic.class, message = "월 실수령액을 입력해 주세요")
             @Min(value = 10_000, message = "1만 원 ~ 3,000만 원 사이로 입력해 주세요")
             @Max(value = 30_000_000, message = "1만 원 ~ 3,000만 원 사이로 입력해 주세요")
-            Long monthlyNetIncome
-    ) {}
+            Long monthlyNetIncome,
+
+            @Min(value = 0, message = "0원 ~ 10억 원 사이로 입력해 주세요")
+            @Max(value = 1_000_000_000, message = "0원 ~ 10억 원 사이로 입력해 주세요")
+            Long annualGrossSalary           // 세전 연봉 (선택). 비우면 월 실수령액 × 12 ÷ 0.88로 추정
+    ) {
+        /**
+         * 세전 연봉 × 1.1 ≥ 월 실수령액 × 12 (v1.7). 세전이 실수령보다 작을 수 없다.
+         * 10% 여유: 비과세 수당(식대 월 20만 원 등)을 뺀 총급여를 넣은 저소득자도 통과하도록.
+         */
+        @JsonIgnore
+        @AssertTrue(message = "세전 연봉이 월 실수령액 × 12보다 작아요. 세금을 떼기 전 금액을 넣어 주세요")
+        public boolean isGrossConsistentWithNet() {
+            if (annualGrossSalary == null || monthlyNetIncome == null) return true;
+            return annualGrossSalary * 11 >= monthlyNetIncome * 120;
+        }
+    }
 
     public record Expenses(
             @NotNull(groups = InputStep.Basic.class, message = "고정지출을 입력해 주세요")
             @Valid ExpenseGroup fixed,
 
             @NotNull(groups = InputStep.Basic.class, message = "변동지출을 입력해 주세요")
-            @Valid ExpenseGroup variable
-    ) {}
+            @Valid ExpenseGroup variable,
+
+            @Min(value = 0, message = "0원 이상으로 입력해 주세요")
+            Long monthlyRent                 // 고정지출 중 월세 (선택). 고정지출에 이미 들어 있어 현금흐름에 다시 더하지 않음
+    ) {
+        @JsonIgnore
+        @AssertTrue(message = "그중 월세는 고정지출보다 클 수 없어요")
+        public boolean isRentWithinFixed() {
+            if (monthlyRent == null || fixed == null || fixed.resolvedTotal() == null) return true;
+            return monthlyRent <= fixed.resolvedTotal();
+        }
+    }
 
     /** 지출 한 묶음. DETAIL이면 items 합계, TOTAL이면 total을 쓴다. */
     public record ExpenseGroup(
@@ -187,7 +215,22 @@ public record SimulationInput(
             @Max(value = 30_000_000, message = "0원 ~ 3,000만 원 사이로 입력해 주세요")
             Long monthlyInvestment,
 
-            Long emergencyFirstAmount
+            Long emergencyFirstAmount,
+
+            // 배분 (선택, 결과 화면 '배분 바꿔 보기'). 엔진이 월 저축액 안에서 청년미래 → 청약 → 연금저축 순서로 떼고 나머지는 일반 적금
+            @Min(value = 0, message = "0원 ~ 50만 원 사이로 입력해 주세요")
+            @Max(value = 500_000, message = "0원 ~ 50만 원 사이로 입력해 주세요")
+            Long policyMonthly,              // 비우면 min(월 저축액, 50만 원)
+
+            // 주택청약종합저축은 월 2만 ~ 50만 원 (상품 약관). 0은 '청약 없음'
+            @Min(value = 0, message = "0원 ~ 50만 원 사이로 입력해 주세요")
+            @Max(value = 500_000, message = "0원 ~ 50만 원 사이로 입력해 주세요")
+            Long housingMonthly,
+
+            // 연금계좌 납입 한도 연 1,800만 원 (연금저축·IRP 합산) → 월 150만 원
+            @Min(value = 0, message = "0원 ~ 150만 원 사이로 입력해 주세요")
+            @Max(value = 1_500_000, message = "0원 ~ 150만 원 사이로 입력해 주세요 (연금계좌 한도 연 1,800만 원)")
+            Long pensionMonthly
     ) {
         private static final Set<Long> EMERGENCY_FIRST_OPTIONS =
                 Set.of(0L, 1_000_000L, 2_000_000L, 3_000_000L, 5_000_000L);

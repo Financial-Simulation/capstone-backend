@@ -92,6 +92,29 @@ class SimulationInputValidationTest {
         assertThat(loan.resolvedRepaymentType()).isEqualTo(RepaymentType.INTEREST_ONLY);
     }
 
+    @Test
+    void 청약은_월_50만_원_연금저축은_월_150만_원까지() {
+        String ok = S1.replace("\"emergencyFirstAmount\": 0 }", "\"emergencyFirstAmount\": 0, \"housingMonthly\": 500000, \"pensionMonthly\": 1500000 }");
+        assertThat(validate(ok, InputStep.ALL)).isEmpty();
+
+        String over = S1.replace("\"emergencyFirstAmount\": 0 }", "\"emergencyFirstAmount\": 0, \"housingMonthly\": 510000, \"pensionMonthly\": 1510000 }");
+        assertThat(validate(over, InputStep.ALL))
+                .containsEntry("savingPlan.housingMonthly", "0원 ~ 50만 원 사이로 입력해 주세요")
+                .containsEntry("savingPlan.pensionMonthly", "0원 ~ 150만 원 사이로 입력해 주세요 (연금계좌 한도 연 1,800만 원)");
+    }
+
+    @Test
+    void 세전_연봉이_실수령액보다_많이_작으면_오류() {
+        // 월 실수령 250만 원 × 12 = 3,000만 원. 세전 × 1.1이 이보다 작으면 오류
+        String low = S1.replace("\"monthlyNetIncome\": 2500000 }", "\"monthlyNetIncome\": 2500000, \"annualGrossSalary\": 27000000 }");
+        assertThat(validate(low, InputStep.ALL))
+                .containsEntry("income.grossConsistentWithNet", "세전 연봉이 월 실수령액 × 12보다 작아요. 세금을 떼기 전 금액을 넣어 주세요");
+
+        // 비과세 식대를 뺀 총급여처럼 실수령 × 12보다 조금 작은 값은 통과 (10% 여유)
+        String edge = S1.replace("\"monthlyNetIncome\": 2500000 }", "\"monthlyNetIncome\": 2500000, \"annualGrossSalary\": 27300000 }");
+        assertThat(validate(edge, InputStep.ALL)).isEmpty();
+    }
+
     private Map<String, String> validate(String json, InputStep step) {
         SimulationInput input = jsonMapper.readValue(json, SimulationInput.class);
         Set<ConstraintViolation<SimulationInput>> violations = validator.validate(input, step.groupsUpToHere());

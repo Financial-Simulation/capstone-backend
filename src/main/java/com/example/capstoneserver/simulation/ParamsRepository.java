@@ -2,6 +2,9 @@ package com.example.capstoneserver.simulation;
 
 import com.example.capstoneserver.simulation.engine.EngineParams;
 import com.example.capstoneserver.simulation.engine.EngineParams.General;
+import com.example.capstoneserver.simulation.engine.EngineParams.Housing;
+import com.example.capstoneserver.simulation.engine.EngineParams.Insurance;
+import com.example.capstoneserver.simulation.engine.EngineParams.Pension;
 import com.example.capstoneserver.simulation.engine.EngineParams.Policy;
 import com.example.capstoneserver.simulation.engine.EngineParams.Stats;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -34,7 +37,8 @@ public class ParamsRepository {
         try (InputStream in = new ClassPathResource("params.json").getInputStream()) {
             ParamsFile file = jsonMapper.readValue(in, ParamsFile.class);
             this.modelVersion = file.modelVersion();
-            this.engineParams = new EngineParams(file.params(), file.policy(), file.general());
+            this.engineParams = new EngineParams(file.params(), file.policy(), file.general(), file.housing(), file.pension(),
+                    file.taxRules().insurance());
             this.robust = file.robust();
             this.meta = file.meta();
         } catch (IOException e) {
@@ -43,7 +47,11 @@ public class ParamsRepository {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private record ParamsFile(String modelVersion, Stats params, Policy policy, General general, Robust robust, JsonNode meta) {}
+    private record ParamsFile(String modelVersion, Stats params, Policy policy, General general, Housing housing,
+                              Pension pension, TaxRules taxRules, Robust robust, JsonNode meta) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record TaxRules(Insurance insurance) {}
 
     /** 가능성 범위 계산에서 바꾸는 범위와 급전 확률표 (구현 명세서 7.5) */
     @JsonIgnoreProperties(ignoreUnknown = true)
