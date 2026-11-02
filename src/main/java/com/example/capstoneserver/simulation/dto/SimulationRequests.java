@@ -45,4 +45,8 @@ public final class SimulationRequests {
             @NotNull(message = "입력을 보내 주세요") SimulationInput input,
             List<@Valid PlanSpec> plans
     ) {}
+
+    public record Recommend(
+            @NotNull(message = "입력을 보내 주세요") SimulationInput input
+    ) {}
 }

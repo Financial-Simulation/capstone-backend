@@ -135,7 +135,7 @@ class PlanAdjusterTest {
 
         Adjustments build() {
             return new Adjustments(null, null, monthlyVariableExpense, monthlySaving,
-                    null, null, null, null, goalTargetDate, events);
+                    null, null, null, null, goalTargetDate, events, null, null, null);
         }
     }
 }

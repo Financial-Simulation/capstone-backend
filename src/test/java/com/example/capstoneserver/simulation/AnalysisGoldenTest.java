@@ -20,7 +20,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * 구현 명세서 8.4: 입력 8개마다 API 결과가 정답 파일과 같은지 본다.
+ * 구현 명세서 8.4: 입력 11개(S1~S3 기본, E1~E5 경계, T1~T3 세금)마다 API 결과가 정답 파일과 같은지 본다.
  * 숫자는 반올림 후 값으로, 문장은 글자까지 비교한다. 응답에만 있는 필드(changes, searched 등)는 보지 않는다.
  * 정답 파일은 기준 저장소 engine/analysis_golden.json을 복사한 것.
  */
@@ -79,12 +79,17 @@ class AnalysisGoldenTest {
         });
     }
 
+    @Test
+    void recommend가_정답과_같다() {
+        forEachCase((key, c, input) -> assertSame(key + ".recommend", c.get("recommend"), service.recommend(input, null)));
+    }
+
     private interface CaseCheck {
         void check(String key, JsonNode c, SimulationInput input);
     }
 
     private void forEachCase(CaseCheck check) {
-        assertThat(golden.get("cases").size()).isEqualTo(8);
+        assertThat(golden.get("cases").size()).isEqualTo(11);
         for (JsonNode c : golden.get("cases")) {
             check.check(c.get("key").asString(), c, mapper.treeToValue(c.get("input"), SimulationInput.class));
         }

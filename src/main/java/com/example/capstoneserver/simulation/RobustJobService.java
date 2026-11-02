@@ -72,7 +72,7 @@ public class RobustJobService {
         try {
             job.result = simulationService.runRobust(task, done -> job.done = done);
             job.finish(Status.DONE);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | Error e) {   // 메모리 부족 같은 Error도 작업을 FAILED로 끝내야 '계산 중'으로 남지 않는다
             log.error("가능성 범위 계산 실패: {}", jobId, e);
             job.finish(Status.FAILED);
         } finally {

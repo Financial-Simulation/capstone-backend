@@ -42,6 +42,7 @@ public class InputValidationService {
     private static final int POLICY_MAX_AGE = 34;
     private static final long POLICY_MAX_GROSS_SALARY = 75_000_000;    // 총급여 7,500만 원
     private static final long POLICY_MONTHLY_LIMIT = 500_000;          // 월 50만 원까지
+    private static final long POLICY_MATCH_MAX_GROSS_SALARY = 60_000_000;  // 정부 지원금(일반형 6%)은 총급여 6,000만 원 이하 (우리은행 상품설명서)
 
     private final Validator validator;
     private final LoanCalculator loanCalculator;
@@ -184,20 +185,36 @@ public class InputValidationService {
         if (!allPresent(age, netIncome, saving)) {
             return null;
         }
+        Long gross = input.income().annualGrossSalary();   // 세전 연봉을 넣었으면 그 값으로 판정 (v1.7)
+        SimulationInput.SavingPlan sp = input.savingPlan();
+        long housing = sp.housingMonthly() == null ? 0 : sp.housingMonthly();
+        long pension = sp.pensionMonthly() == null ? 0 : sp.pensionMonthly();
 
         String reason = null;
         if (age > POLICY_MAX_AGE) {
             reason = "만 34세를 넘어 청년미래적금 대상이 아니에요. 일반 적금으로 계산해요.";
-        } else if (grossSalaryOver(netIncome)) {
+        } else if (gross != null ? gross > POLICY_MAX_GROSS_SALARY : grossSalaryOver(netIncome)) {
             reason = "총급여가 7,500만 원을 넘어 청년미래적금 대상이 아니에요. 일반 적금으로 계산해요.";
         }
 
         if (reason != null) {
             warnings.add(new Warning("INFO_POLICY_INELIGIBLE", reason));
-            return new PolicySaving(false, reason, 0, saving);
+            return new PolicySaving(false, reason, 0, rest(saving, 0, housing, pension));
         }
-        long policy = Math.min(saving, POLICY_MONTHLY_LIMIT);
-        return new PolicySaving(true, null, policy, saving - policy);
+        if (gross != null ? gross > POLICY_MATCH_MAX_GROSS_SALARY : netIncome * 12 * 100 > POLICY_MATCH_MAX_GROSS_SALARY * 88) {
+            warnings.add(new Warning("INFO_POLICY_NO_MATCH",
+                    "총급여가 6,000만 원을 넘어 청년미래적금 정부 지원금은 없어요. 가입과 이자는 그대로예요."));
+        }
+        long cap = sp.policyMonthly() == null ? POLICY_MONTHLY_LIMIT : Math.min(sp.policyMonthly(), POLICY_MONTHLY_LIMIT);
+        long policy = Math.min(saving, cap);
+        return new PolicySaving(true, null, policy, rest(saving, policy, housing, pension));
+    }
+
+    /** 일반 적금으로 가는 돈: 월 저축액에서 청년미래 → 청약 → 연금저축 순서로 떼고 남는 돈 (엔진과 같은 규칙) */
+    private static long rest(long saving, long policy, long housing, long pension) {
+        long h = Math.min(housing, Math.max(saving - policy, 0));
+        long p = Math.min(pension, Math.max(saving - policy - h, 0));
+        return saving - policy - h - p;
     }
 
     /** 총급여 = 실수령액 × 12 ÷ 0.88 > 7,500만 원 (소수 오차를 피하려고 양변에 0.88을 곱해 비교) */
