@@ -3,7 +3,9 @@ package com.example.capstoneserver.loan;
 import com.example.capstoneserver.global.util.Money;
 import com.example.capstoneserver.input.dto.RepaymentType;
 import com.example.capstoneserver.loan.dto.RepaymentPreviewResponse;
+import com.example.capstoneserver.simulation.engine.EngineLoan;
 import java.math.BigDecimal;
+import java.util.List;
 import org.springframework.stereotype.Component;
 
 /**
@@ -55,6 +57,47 @@ public class LoanCalculator {
                 Money.roundWon(lastPayment),
                 Money.roundWon(totalInterest)
         );
+    }
+
+    /**
+     * 시뮬레이션용 달별 상환액 합계 (구현 명세서 6.1). 단위는 넣은 금액과 같다 (엔진은 만 원).
+     * 남은 기간이 T보다 길면 T개월까지만 계산한다.
+     */
+    public double[] monthlyPayments(List<EngineLoan> loans, int t) {
+        double[] pay = new double[t];
+        for (EngineLoan loan : loans) {
+            addSchedule(loan, pay);
+        }
+        return pay;
+    }
+
+    private void addSchedule(EngineLoan loan, double[] pay) {
+        double balance = loan.balance();
+        double i = loan.rate() / 12;
+        int n = loan.months();
+        RepaymentType method = loan.method();
+        double equal = 0;
+        if (method == RepaymentType.EQUAL_PAYMENT) {
+            equal = i > 0
+                    ? balance * i * StrictMath.pow(1 + i, n) / (StrictMath.pow(1 + i, n) - 1)
+                    : balance / n;
+        }
+
+        for (int t = 0; t < pay.length; t++) {
+            if (balance <= 1e-9) continue;
+            double interest = balance * i;
+            double payment = switch (method) {
+                case EQUAL_PAYMENT -> Math.min(equal, balance + interest);
+                case EQUAL_PRINCIPAL -> Math.min(balance, loan.balance() / n) + interest;
+                case INTEREST_ONLY -> t < n ? interest : 0;   // 원금은 현금흐름 밖 (보증금 반환으로 상환)
+                case BULLET -> interest + (t == n - 1 ? balance : 0);
+            };
+            if (method != RepaymentType.INTEREST_ONLY) {
+                balance = Math.max(balance - (payment - interest), 0);
+            }
+            pay[t] += payment;
+            if (method == RepaymentType.INTEREST_ONLY && t == n - 1) balance = 0;
+        }
     }
 
     /** 이번 달에 갚는 원금 */

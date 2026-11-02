@@ -40,3 +40,9 @@ out/
 .DS_Store
 ### 개인 Java 경로 ###
 gradle.properties
+
+### 기준 저장소 클론 (참고용, 값은 src/main/resources/params.json 과 src/test/resources/golden 으로 복사해 씀) ###
+finance-simulator-reference/
+
+### 발표 자료·화면 캡처·영상 (용량이 커서 저장소에 올리지 않음) ###
+docs/example/
