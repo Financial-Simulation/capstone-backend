@@ -10,8 +10,10 @@ import com.example.capstoneserver.global.response.Warning;
 import com.example.capstoneserver.input.dto.SimulationInput;
 import com.example.capstoneserver.loan.LoanCalculator;
 import com.example.capstoneserver.plan.dto.Change;
+import com.example.capstoneserver.simulation.dto.Allocation;
 import com.example.capstoneserver.simulation.dto.CompareResponse;
 import com.example.capstoneserver.simulation.dto.PreviewResponse;
+import com.example.capstoneserver.simulation.dto.RecommendResponse;
 import com.example.capstoneserver.simulation.dto.ReverseResponse;
 import com.example.capstoneserver.simulation.dto.ReverseResponse.EmergencyStrategy;
 import com.example.capstoneserver.simulation.dto.ReverseResponse.GridPoint;
@@ -24,6 +26,7 @@ import com.example.capstoneserver.simulation.engine.EngineParams;
 import com.example.capstoneserver.simulation.engine.EngineProfile;
 import com.example.capstoneserver.simulation.engine.EngineResult;
 import com.example.capstoneserver.simulation.engine.EngineResult.Flag;
+import com.example.capstoneserver.simulation.engine.EngineResult.TaxItem;
 import com.example.capstoneserver.simulation.engine.NoiseSource;
 import com.example.capstoneserver.simulation.engine.SimulationEngine;
 import java.math.BigDecimal;
@@ -37,7 +40,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
- * 엔진 결과 → API 응답 (구현 명세서 7장). 정의는 기준 저장소 make_analysis_golden.js와 같다.
+ * 엔진 결과 → API 응답 (구현 명세서 7장, 세금 모듈 7.2·7.4). 정의는 기준 저장소 make_analysis_golden.js와 같다.
  * 모든 계획은 같은 seed로 계산하므로 차이는 바꾼 내용에서만 나온다.
  */
 @Component
@@ -60,15 +63,16 @@ class Analyzer {
 
     /** R만: 확률만 필요한 탐색용 */
     PlanRun runMain(EnginePlan plan, int seed) {
-        return new PlanRun(plan, run(plan, paramsRepository.getEngineParams(), seed, HORIZON, true), null, null);
+        return new PlanRun(plan, run(plan, paramsRepository.getEngineParams(), seed, HORIZON, true), null, null, null);
     }
 
-    /** R + F36 + F48 */
+    /** R + F36 + F48 + TG(목표 시점까지: 세금·청약·연금 해지) */
     PlanRun runFull(EnginePlan plan, int seed) {
         EngineParams params = paramsRepository.getEngineParams();
         EngineParams firstAccount = params.withoutRejoin();
         return new PlanRun(plan, run(plan, params, seed, HORIZON, true),
-                run(plan, firstAccount, seed, 36, false), run(plan, firstAccount, seed, 48, false));
+                run(plan, firstAccount, seed, 36, false), run(plan, firstAccount, seed, 48, false),
+                run(plan, params, seed, Math.max(plan.goalMonths(), 1), false));
     }
 
     private EngineResult run(EnginePlan plan, EngineParams params, int seed, int t, boolean collect) {
@@ -128,7 +132,26 @@ class Analyzer {
 
         return new SimulateResponse(seed, PATHS, paramsRepository.getModelVersion(), input.startMonth(), headline, goal,
                 new SimulateResponse.Deterministic(won(det.at(0, gm)), won(det.at(0, HORIZON))),
-                checkpoints, bands, new SimulateResponse.Risks(debt, policySaving), causes(run), markers, warnings);
+                checkpoints, bands, new SimulateResponse.Risks(debt, policySaving), causes(run), tax(run), markers, warnings);
+    }
+
+    /** 세금 블록 (목표 시점까지 평균). 해지 확률은 그 상품이 있을 때만 */
+    private SimulateResponse.Tax tax(PlanRun run) {
+        double years = Math.max(run.plan().goalMonths(), 1) / 12.0;
+        double refund = run.meanTax(TaxItem.REFUND);
+        EngineResult.Allocation a = run.main().alloc();
+        return new SimulateResponse.Tax(won(refund), won(refund / years), won(run.meanTax(TaxItem.INTEREST_TAX)),
+                won(run.meanTax(TaxItem.CLAWBACK)), won(run.meanTax(TaxItem.PENSION_TAX)), won(run.taxNetBenefit()),
+                a.housing() > 0 ? percent(run.toGoal().count(Flag.BRK_H), PATHS) : null,
+                a.pension() > 0 ? percent(run.toGoal().count(Flag.BRK_PEN), PATHS) : null,
+                allocation(run.main(), run.plan()));
+    }
+
+    /** 실제 배분 (원). 일반 적금 = 저축액 − 상품 납입 */
+    private static Allocation allocation(EngineResult r, EnginePlan plan) {
+        EngineResult.Allocation a = r.alloc();
+        return new Allocation(won(a.policy()), won(a.housing()), won(a.pension()),
+                won(Math.max(plan.profile().save() - a.policy() - a.housing() - a.pension(), 0)));
     }
 
     private SimulateResponse.Causes causes(PlanRun run) {
@@ -215,7 +238,95 @@ class Analyzer {
                 won(run.quantile(run.plan().goalMonths(), .05)),
                 eligible ? percent(run.earlyTerminations(), PATHS) : null,
                 eligible ? won(run.expectedSubsidy()) : null,
-                yearlyP50(run));
+                yearlyP50(run),
+                won(run.medianAtGoal()),
+                won(run.taxNetBenefit()),
+                allocation(run.main(), run.plan()));
+    }
+
+    // ===== /allocations/recommend (자산 쪼개기) =====
+
+    /** 청약 25만 = 소득공제 한도(연 300만). 만 원 */
+    private static final double[] REC_HOUSING = {0, 10, 25};
+    private static final double[] REC_PENSION = {0, 10, 20, 30, 50};
+    private static final String REC_RULE = "청년미래 0~50만 원(10만 원 간격), 청약 0·10·25만 원, 연금저축 0·10·20·30·50만 원 중 월 저축액 안에 드는 조합. "
+            + "세금·지원금 최대는 지금보다 가능성이 2%p보다 많이 낮아지지 않는 배분 중에서 고름";
+
+    private record Scored(EngineResult.Allocation alloc, int hits, long taxNet, long subsidy, BigDecimal policyBreak) {
+        long benefit() {
+            return taxNet + subsidy;
+        }
+    }
+
+    /**
+     * 격자 안의 배분을 같은 미래 2,000개로 모두 계산해 목표 달성 최대 배분과 세금·지원금 최대 배분을 고른다.
+     * 배분 하나 = R(T = 120)의 목표 시점 달성 수 + TG(T = 목표 개월)의 세금 순이득·지원금·청년미래 해지.
+     */
+    RecommendResponse recommend(EnginePlan plan, long seedValue) {
+        int seed = (int) seedValue;
+        EngineProfile pr = plan.profile();
+        double save = pr.save();
+        EngineResult probe = engine.simulate(pr, paramsRepository.getEngineParams(), NoiseSource.zero(), 1, 1, plan.bufferFirst(), false);
+        List<Double> policies = new ArrayList<>();
+        if (probe.eligible()) {
+            double cap = Math.min(save, paramsRepository.getEngineParams().policy().cap());
+            for (double v = 0; v <= cap + 1e-9; v += 10) policies.add(v);
+            if (cap % 10 != 0) policies.add(cap);
+        } else {
+            policies.add(0.0);
+        }
+
+        EngineResult.Allocation now = probe.alloc();
+        Scored current = scoreAllocation(plan, now.policy(), now.housing(), now.pension(), seed);
+        Scored bestP = null;
+        Scored bestB = null;
+        int count = 0;
+        for (double pol : policies) {
+            for (double hou : REC_HOUSING) {
+                for (double pen : REC_PENSION) {
+                    if (pol + hou + pen > save + 1e-9) continue;
+                    Scored s = scoreAllocation(plan, pol, hou, pen, seed);
+                    count++;
+                    if (bestP == null || s.hits() > bestP.hits() || (s.hits() == bestP.hits() && s.benefit() > bestP.benefit())) bestP = s;
+                    if (s.hits() >= current.hits() - 0.02 * PATHS
+                            && (bestB == null || s.benefit() > bestB.benefit() || (s.benefit() == bestB.benefit() && s.hits() > bestB.hits()))) {
+                        bestB = s;
+                    }
+                }
+            }
+        }
+        return new RecommendResponse(won(save), count, option(current, current, plan), option(bestP, current, plan),
+                option(bestB, current, plan), REC_RULE);
+    }
+
+    private Scored scoreAllocation(EnginePlan base, double pol, double hou, double pen, int seed) {
+        EnginePlan plan = base.withProfile(base.profile().withAllocation(pol, hou, pen));
+        EngineParams params = paramsRepository.getEngineParams();
+        EngineResult main = run(plan, params, seed, HORIZON, true);
+        EngineResult toGoal = run(plan, params, seed, Math.max(plan.goalMonths(), 1), false);
+        int hits = 0;
+        for (int p = 0; p < PATHS; p++) {
+            if (main.at(p, plan.goalMonths()) >= plan.goal()) hits++;
+        }
+        // 합계끼리 뺀 뒤 나눈다 (정답 파일과 같은 순서. 평균끼리 빼면 마지막 자리가 달라져 원 단위 반올림이 어긋날 수 있다)
+        double[] sum = new double[TaxItem.values().length];
+        double subsidy = 0;
+        for (int p = 0; p < PATHS; p++) {
+            for (int k = 0; k < sum.length; k++) sum[k] += toGoal.tax()[k][p];
+            subsidy += toGoal.matchPaid()[p];
+        }
+        double net = (sum[0] - sum[1] - sum[2] - sum[3]) / PATHS;
+        return new Scored(main.alloc(), hits, won(net), won(subsidy / PATHS),
+                main.eligible() ? percent(toGoal.count(Flag.BRK1_GEN), PATHS) : null);
+    }
+
+    private static RecommendResponse.Option option(Scored s, Scored current, EnginePlan plan) {
+        if (s == null) return null;
+        EngineResult.Allocation a = s.alloc();
+        Allocation alloc = new Allocation(won(a.policy()), won(a.housing()), won(a.pension()),
+                won(Math.max(plan.profile().save() - a.policy() - a.housing() - a.pension(), 0)));
+        return new RecommendResponse.Option(alloc, s.hits(), percent(s.hits(), PATHS), s.taxNet(), s.subsidy(), s.benefit(),
+                s.policyBreak(), percent(s.hits() - current.hits(), PATHS));
     }
 
     // ===== /reverse =====

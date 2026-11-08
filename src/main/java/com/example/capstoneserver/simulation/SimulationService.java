@@ -10,6 +10,7 @@ import com.example.capstoneserver.plan.dto.Adjustments;
 import com.example.capstoneserver.simulation.dto.CompareResponse;
 import com.example.capstoneserver.simulation.dto.PlanSpec;
 import com.example.capstoneserver.simulation.dto.PreviewResponse;
+import com.example.capstoneserver.simulation.dto.RecommendResponse;
 import com.example.capstoneserver.simulation.dto.ReverseResponse;
 import com.example.capstoneserver.simulation.dto.RobustResponse;
 import com.example.capstoneserver.simulation.dto.SimulateResponse;
@@ -75,6 +76,12 @@ public class SimulationService {
             results.add(analyzer.comparedPlan(plans.get(i).name(), start, run, base));
         }
         return new CompareResponse(seedValue, basePlan.goalMonths(), results);
+    }
+
+    /** 자산 쪼개기 자동 추천 (청년미래·청약·연금저축 배분) */
+    public RecommendResponse recommend(SimulationInput input, Long seed) {
+        inputValidationService.checkRequired(input);
+        return analyzer.recommend(profileMapper.toPlan(input), seedOf(seed));
     }
 
     public ReverseResponse reverse(SimulationInput input, BigDecimal targetProbability, Long seed) {

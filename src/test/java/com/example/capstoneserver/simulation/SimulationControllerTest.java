@@ -38,7 +38,7 @@ class SimulationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("COMMON200"))
                 .andExpect(jsonPath("$.result.seed").value(20261007))
-                .andExpect(jsonPath("$.result.modelVersion").value("1.6"))
+                .andExpect(jsonPath("$.result.modelVersion").value("1.7"))
                 .andExpect(jsonPath("$.result.goal.probability").value(58.0))
                 .andExpect(jsonPath("$.result.goal.targetDate").value("2031-11"))
                 .andExpect(jsonPath("$.result.deterministic.atGoal").value(44396264))
@@ -128,6 +128,27 @@ class SimulationControllerTest {
     }
 
     @Test
+    void recommend는_배분_세_가지를_돌려준다() throws Exception {
+        mockMvc.perform(post("/api/allocations/recommend").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"input\":" + s1 + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.current.allocation.policyMonthly").value(500000))
+                .andExpect(jsonPath("$.result.bestProbability.probability").value(58.9))
+                .andExpect(jsonPath("$.result.bestBenefit.allocation").exists());
+    }
+
+    @Test
+    void reports는_simulate_결과와_세금_블록을_묶어_준다() throws Exception {
+        mockMvc.perform(post("/api/reports").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"input\":" + s1 + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.goal.probability").value(58.0))
+                .andExpect(jsonPath("$.result.tax.interestTax").value(46687))
+                .andExpect(jsonPath("$.result.levers.length()").value(3))
+                .andExpect(jsonPath("$.result.comparison.length()").value(0));
+    }
+
+    @Test
     void 없는_작업을_조회하면_JOB404() throws Exception {
         mockMvc.perform(get("/api/robust/rb-none"))
                 .andExpect(status().isNotFound())
@@ -138,7 +159,7 @@ class SimulationControllerTest {
     void meta는_파라미터_근거를_돌려준다() throws Exception {
         mockMvc.perform(get("/api/meta"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.modelVersion").value("1.6"))
+                .andExpect(jsonPath("$.result.modelVersion").value("1.7"))
                 .andExpect(jsonPath("$.result.defaultSeed").value(20261007))
                 .andExpect(jsonPath("$.result.parameters[0].grade").exists());
     }

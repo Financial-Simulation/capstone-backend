@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * API 입력(원, %, YYYY-MM) → 엔진 프로필(만 원, 연 소수, 개월). 구현 명세서 2.1~2.2.
+ * 세금·상품 칸: 세전 연봉(없으면 엔진이 실수령 × 12 ÷ 0.88로 추정), 월세, 무주택 세대주(기본 예), 시작 달, 상품별 월 납입.
  * adjustments는 PlanAdjuster가 입력에 먼저 덮어쓰므로 여기서는 입력만 본다.
  * 입력은 InputValidationService.checkRequired()를 통과한 상태여야 한다.
  */
@@ -41,7 +42,14 @@ public class ProfileMapper {
                 input.savingPlan().generalSavingRate().doubleValue() / 100,
                 man(input.emergency().breakThreshold()),
                 loans,
-                events);
+                events,
+                input.income().annualGrossSalary() == null ? null : man(input.income().annualGrossSalary()),
+                manOrZero(input.expenses().monthlyRent()),
+                !Boolean.FALSE.equals(input.person().homelessHouseholder()),
+                start.getMonthValue(),
+                input.savingPlan().policyMonthly() == null ? null : man(input.savingPlan().policyMonthly()),
+                manOrZero(input.savingPlan().housingMonthly()),
+                manOrZero(input.savingPlan().pensionMonthly()));
 
         return new EnginePlan(profile, man(input.goal().targetAmount()),
                 months(start, input.goal().targetDate()), man(input.savingPlan().emergencyFirstAmount()));
@@ -63,5 +71,10 @@ public class ProfileMapper {
 
     private static double man(long won) {
         return won / 10000.0;
+    }
+
+    /** 선택 칸(세금·상품)은 비어 있으면 0 */
+    private static double manOrZero(Long won) {
+        return won == null ? 0 : won / 10000.0;
     }
 }

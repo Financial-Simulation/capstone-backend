@@ -2,6 +2,7 @@ package com.example.capstoneserver.simulation;
 
 import com.example.capstoneserver.simulation.engine.EngineResult;
 import com.example.capstoneserver.simulation.engine.EngineResult.Flag;
+import com.example.capstoneserver.simulation.engine.EngineResult.TaxItem;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -13,8 +14,9 @@ import java.util.List;
  * @param main   본 계산 R (T = 120, 재가입 있음)
  * @param first36 첫 계좌 계산 F36. 확률만 필요한 탐색에서는 null
  * @param first48 첫 계좌 계산 F48. 확률만 필요한 탐색에서는 null
+ * @param toGoal  목표 시점까지 계산 TG (T = 목표 개월). 세금·청약·연금 해지는 목표 시점까지 센다. 확률만 필요한 탐색에서는 null
  */
-record PlanRun(EnginePlan plan, EngineResult main, EngineResult first36, EngineResult first48) {
+record PlanRun(EnginePlan plan, EngineResult main, EngineResult first36, EngineResult first48, EngineResult toGoal) {
 
     private static final int NEVER = Integer.MAX_VALUE;
 
@@ -97,6 +99,21 @@ record PlanRun(EnginePlan plan, EngineResult main, EngineResult first36, EngineR
         double sum = 0;
         for (double paid : first48.matchPaid()) sum += paid;
         return sum / first48.n();
+    }
+
+    /** 목표 시점까지 2,000개 미래의 평균 (만 원) */
+    double meanTax(TaxItem item) {
+        return toGoal.meanTax(item);
+    }
+
+    /** 세금 순이득 = 환급 − 이자소득세 − 청약 추징 − 연금 기타소득세 (평균끼리 뺀다, 만 원) */
+    double taxNetBenefit() {
+        return meanTax(TaxItem.REFUND) - meanTax(TaxItem.INTEREST_TAX) - meanTax(TaxItem.CLAWBACK) - meanTax(TaxItem.PENSION_TAX);
+    }
+
+    /** 목표 시점 모은 돈의 중간값 */
+    double medianAtGoal() {
+        return quantile(plan.goalMonths(), .50);
     }
 
     /** 오름차순 정렬 후 ⌊(n − 1) / 2⌋번째 (낮은 쪽 중앙값) */

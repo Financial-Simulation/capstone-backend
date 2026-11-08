@@ -21,7 +21,10 @@ public record Adjustments(
         Long breakThreshold,            // → emergency.breakThreshold
         Long goalTargetAmount,          // → goal.targetAmount
         String goalTargetDate,          // → goal.targetDate
-        List<Event> events              // → events[] (목록 전체 교체)
+        List<Event> events,             // → events[] (목록 전체 교체)
+        Long policyMonthly,             // → savingPlan.policyMonthly (배분 바꿔 보기)
+        Long housingMonthly,            // → savingPlan.housingMonthly
+        Long pensionMonthly             // → savingPlan.pensionMonthly
 ) {
 
     /** 바꿀 값이 하나도 없는지 */
@@ -29,7 +32,7 @@ public record Adjustments(
     public boolean isEmpty() {
         return Stream.of(monthlyNetIncome, monthlyFixedExpense, monthlyVariableExpense, monthlySaving,
                         monthlyInvestment, emergencyFirstAmount, breakThreshold, goalTargetAmount,
-                        goalTargetDate, events)
+                        goalTargetDate, events, policyMonthly, housingMonthly, pensionMonthly)
                 .allMatch(v -> v == null);
     }
 }
