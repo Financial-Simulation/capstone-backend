@@ -1,0 +1,11 @@
+.git
+.gradle
+.idea
+build
+out
+bin
+*.iml
+docs
+finance-simulator-reference
+http
+HELP.md
