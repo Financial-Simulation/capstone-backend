@@ -2,7 +2,7 @@ FROM eclipse-temurin:21-jdk AS build
 WORKDIR /app
 
 # 의존성만 먼저 받아 두면 소스만 바뀐 빌드에서 이 층을 다시 쓴다
-COPY gradlew settings.gradle build.gradle gradle.properties ./
+COPY gradlew settings.gradle build.gradle ./
 COPY gradle gradle
 RUN chmod +x gradlew && ./gradlew dependencies --no-daemon -q > /dev/null
 
