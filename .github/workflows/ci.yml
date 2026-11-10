@@ -87,8 +87,8 @@ jobs:
         run: |
           docker run -d --name app -p 8080:8080 -e PORT=8080 capstone-backend:ci
           for i in $(seq 1 30); do
-            if curl -fsS http://localhost:8080/api/meta > /dev/null; then
-              echo "GET /api/meta 200 (${i}회째 시도)"
+            if curl -fsS http://localhost:8080/actuator/health > /dev/null; then
+              echo "GET /actuator/health 200 (${i}회째 시도)"
               exit 0
             fi
             sleep 2
