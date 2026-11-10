@@ -40,8 +40,12 @@ jobs:
       - name: First request (cold start)
         id: first
         run: |
-          t=$(curl -s -o /dev/null -w '%{time_total}' --max-time 180 "$BASE_URL/api/meta" || echo "")
-          echo "첫 요청 ${t:-실패}초"
+          url="${BASE_URL%/}/api/meta"
+          out=$(curl -s -o /dev/null -w '%{http_code} %{time_total}' --max-time 180 "$url" || echo "000 ")
+          code=${out%% *}; t=${out#* }
+          echo "첫 요청 $url → HTTP $code, ${t}초"
+          # 200이 아니면 깨어난 시간으로 보지 않는다
+          [ "$code" = "200" ] || t=""
           echo "seconds=$t" >> "$GITHUB_OUTPUT"
 
       - uses: grafana/setup-k6-action@v1
