@@ -14,6 +14,7 @@ import com.example.capstoneserver.simulation.dto.RecommendResponse;
 import com.example.capstoneserver.simulation.dto.ReverseResponse;
 import com.example.capstoneserver.simulation.dto.RobustResponse;
 import com.example.capstoneserver.simulation.dto.SimulateResponse;
+import com.example.capstoneserver.simulation.dto.StoryResponse;
 import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -39,11 +40,18 @@ public class SimulationService {
     private final ProfileMapper profileMapper;
     private final Analyzer analyzer;
     private final RobustAnalyzer robustAnalyzer;
+    private final StoryAnalyzer storyAnalyzer;
 
     public SimulateResponse simulate(SimulationInput input, Long seed) {
         inputValidationService.checkRequired(input);
         var warnings = inputValidationService.validate(InputStep.ALL, input).warnings();
         return analyzer.simulate(input, profileMapper.toPlan(input), seedOf(seed), warnings);
+    }
+
+    /** 미래 다시 보기 (데모): /simulate와 같은 미래 중 상위 5% · 가운데 · 하위 5%를 달마다 */
+    public StoryResponse story(SimulationInput input, Long seed) {
+        inputValidationService.checkRequired(input);
+        return storyAnalyzer.story(profileMapper.toPlan(input), input.startMonth(), seedOf(seed));
     }
 
     public PreviewResponse preview(SimulationInput input, Adjustments adjustments, Long seed) {
