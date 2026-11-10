@@ -92,6 +92,7 @@ x86 인스턴스는 ARM 유형(t4g)으로 바꿀 수 없다 (OS가 다름).
 | `EC2_INSTANCE_ID` | `i-...` |
 | `DEPLOY_BASE_URL` | `http://<탄력적 IP>` |
 
+- [ ] **자동 배포 켜기:** Settings → Secrets and variables → Actions → Variables(저장소 수준)에 `DEPLOY_ENABLED` = `true`. 이 값이 없으면 main 머지 후 Deploy가 건너뛰어진다 (수동 실행은 가능)
 - [ ] (선택, 첫 배포 성공 뒤) Required reviewers에 승인자 지정 → 배포 전에 승인을 받아야 진행
 - [ ] (선택) 브랜치 보호: Settings → Branches → main → Require status checks → `Test (golden 포함)`, `Docker build + smoke test`
 

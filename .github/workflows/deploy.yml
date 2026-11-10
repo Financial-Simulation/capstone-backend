@@ -34,7 +34,10 @@ permissions:
 
 jobs:
   deploy:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    # 자동 배포는 저장소 변수 DEPLOY_ENABLED=true 일 때만. AWS 설정 전에는 건너뛴다(빨간불 없음)
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (vars.DEPLOY_ENABLED == 'true' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
