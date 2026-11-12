@@ -22,7 +22,7 @@ jobs:
     # 초안 PR과 포크에서 온 PR(시크릿을 못 읽음)은 건너뛴다
     if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20   # Gemini 1회 최대 5분 × 재시도
     steps:
       - uses: actions/checkout@v5
         with:
@@ -33,6 +33,7 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+          GEMINI_THINKING_LEVEL: ${{ vars.GEMINI_THINKING_LEVEL || 'low' }}
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}

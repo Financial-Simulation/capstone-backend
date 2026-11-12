@@ -20,6 +20,8 @@ import urllib.request
 MARKER = "<!-- ai-review -->"
 MODEL = os.environ.get("GEMINI_MODEL") or "gemini-3.6-flash"
 MAX_DIFF_CHARS = int(os.environ.get("MAX_DIFF_CHARS", "120000"))
+THINKING_LEVEL = os.environ.get("GEMINI_THINKING_LEVEL", "low")  # 빈 값이면 모델 기본값
+TIMEOUT_S = int(os.environ.get("GEMINI_TIMEOUT_S", "300"))
 API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 # 리뷰에 보내지 않는 파일. 정답 파일은 기준 구현이 만든 숫자라 사람이 읽을 대상이 아니다
@@ -91,37 +93,56 @@ def collect_diff(base, head):
     return "".join(included), skipped, truncated, golden_changed
 
 
-def call_gemini(api_key, user_text):
-    body = {
-        "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
-        "contents": [{"role": "user", "parts": [{"text": user_text}]}],
-        "generationConfig": {"maxOutputTokens": 8192},
-    }
+def _post(api_key, body, timeout):
     req = urllib.request.Request(
         API_URL.format(model=MODEL),
         data=json.dumps(body).encode(),
         headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
         method="POST",
     )
-    last_err = None
+    with urllib.request.urlopen(req, timeout=timeout) as res:
+        return json.load(res)
+
+
+def call_gemini(api_key, user_text):
+    gen_config = {"maxOutputTokens": 8192}
+    # 리뷰에는 깊은 추론이 필요 없다. 기본값으로 두면 오래 생각하다 시간 초과가 났다 (PR #6)
+    if THINKING_LEVEL:
+        gen_config["thinkingConfig"] = {"thinkingLevel": THINKING_LEVEL}
+    body = {
+        "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+        "contents": [{"role": "user", "parts": [{"text": user_text}]}],
+        "generationConfig": gen_config,
+    }
+    data, last_err = None, None
     for attempt in range(3):
+        started = time.time()
         try:
-            with urllib.request.urlopen(req, timeout=180) as res:
-                data = json.load(res)
+            data = _post(api_key, body, timeout=TIMEOUT_S)
+            print(f"Gemini 응답 {time.time() - started:.0f}초 (시도 {attempt + 1})")
             break
         except urllib.error.HTTPError as e:
             detail = e.read().decode(errors="replace")[:500]
             last_err = f"HTTP {e.code}: {detail}"
+            # 모델이 thinkingConfig를 거부하면 빼고 다시 보낸다
+            if e.code == 400 and "thinking" in detail.lower() and "thinkingConfig" in gen_config:
+                print(f"thinkingConfig 거부됨, 빼고 재시도: {detail[:200]}")
+                gen_config.pop("thinkingConfig")
+                continue
             if e.code in (429, 500, 502, 503, 504) and attempt < 2:
                 time.sleep(10 * (attempt + 1))
                 continue
             raise RuntimeError(last_err)
-        except urllib.error.URLError as e:
-            last_err = str(e)
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            # 읽기 시간 초과(socket.timeout)는 URLError가 아니라 TimeoutError/OSError로 온다
+            last_err = f"{type(e).__name__}: {e} ({time.time() - started:.0f}초)"
+            print(f"재시도 {attempt + 1}: {last_err}")
             if attempt < 2:
                 time.sleep(5)
                 continue
             raise RuntimeError(last_err)
+    if data is None:
+        raise RuntimeError(last_err or "응답 없음")
 
     cands = data.get("candidates") or []
     if not cands:
