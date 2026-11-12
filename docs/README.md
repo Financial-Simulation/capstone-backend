@@ -7,14 +7,14 @@
 | 폴더 | 내용 |
 |---|---|
 | `architecture/` | API 전체 구조, 공통 규칙 요약 |
-| `tasks/<작업명>/` | 작업 단위 기록. `decision.md`(무엇을 왜 결정했나) · `context.md`(배경·관련 자료) · `checklist.md`(남은 일) |
+| `tasks/<작업명>/` | 작업 단위 기록. `decision.md`(무엇을 왜 결정했나) · `context.md`(배경·관련 자료) · `checklist.md`(남은 일) · `setup-*.md`(따라 하는 설정 순서) |
 
 ## 작업 목록
 
 | 작업 | 상태 | 요약 |
 |---|---|---|
 | [api-spec-revamp](tasks/api-spec-revamp/decision.md) | 노션 반영 완료 (2026-10-08) | 엔드포인트 32개 → 12개, 서버 입력 비저장 |
-| [infra-queue-k6-aws-cicd](tasks/infra-queue-k6-aws-cicd/plan.md) | 팀 합의 전 | `/robust` 작업 큐, k6 부하 테스트, AWS, CI/CD |
+| [infra-queue-k6-aws-cicd](tasks/infra-queue-k6-aws-cicd/plan.md) | CI·CD 작성 완료, AWS 설정 중 (2026-11-10). 큐는 팀 합의 전 | `/robust` 작업 큐, k6, AWS(EC2), CI/CD. 설정 순서는 [setup-aws](tasks/infra-queue-k6-aws-cicd/setup-aws.md) |
 | [engine-port](tasks/engine-port/decision.md) | 구현·정답 대조 완료 (2026-11-02) | 계산 엔진 Java 이식, `/simulate`·`/compare`·`/reverse`·`/robust`·`/meta` |
 | [tax-module-v1.7](tasks/tax-module-v1.7/decision.md) | 구현·정답 대조 완료 (2026-11-02), 리뷰 대기 | 세금 모듈(연말정산·청약·연금저축·4대보험), `/allocations/recommend`, `/reports` |
 | [presentation-demo](tasks/presentation-demo/plan.md) | 확정 (2026-10-29) | 피드백에 답하는 발표 PPT 12장(약 8분)과 대본, 데모 수준 B(입력 라이브 + 미리 계산한 결과) |
