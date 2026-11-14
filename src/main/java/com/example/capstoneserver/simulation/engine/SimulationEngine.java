@@ -35,6 +35,41 @@ public class SimulationEngine {
 
     public EngineResult simulate(EngineProfile pr, EngineParams params, NoiseSource noise,
                                  int n, int t, double bufferFirst, boolean collect) {
+        Prepared pre = prepare(pr, params, t);
+        Setup setup = pre.setup();
+
+        double[] saved = collect ? new double[n * (t + 1)] : null;
+        byte[][] flags = new byte[Flag.values().length][n];
+        int[] firstBrk = new int[n];
+        double[] matchPaid = new double[n];
+        double[][] tax = new double[TaxItem.values().length][n];
+
+        IntStream.range(0, n).parallel().forEach(p -> runPath(pr, params, noise.noise(p, t), p, t, bufferFirst, setup,
+                pre.loanPay(), pre.events(), saved, flags, firstBrk, matchPaid, tax, null));
+
+        return new EngineResult(saved, flags, firstBrk, matchPaid, tax,
+                new Allocation(setup.a1(), setup.hm(), setup.pm()), pre.eligible(), n, t);
+    }
+
+    /**
+     * 미래 하나(path번째)를 달마다 기록한다 (데모 '미래 다시 보기'). simulate와 같은 noise · 같은 runPath라서
+     * 기록의 모은 돈(total)은 simulate의 그 경로 값과 같다.
+     */
+    public PathTrace trace(EngineProfile pr, EngineParams params, NoiseSource noise, int path, int t, double bufferFirst) {
+        Prepared pre = prepare(pr, params, t);
+        int n = path + 1;   // runPath는 경로 번호 칸에 쓰므로 그 칸까지만 만든다
+        byte[][] flags = new byte[Flag.values().length][n];
+        double[][] tax = new double[TaxItem.values().length][n];
+        PathTrace.Recorder rec = new PathTrace.Recorder();
+        runPath(pr, params, noise.noise(path, t), path, t, bufferFirst, pre.setup(), pre.loanPay(), pre.events(),
+                null, flags, new int[n], new double[n], tax, rec);
+        return new PathTrace(path, List.copyOf(rec.months));
+    }
+
+    /** 프로필마다 한 번 정하는 값과 대출 상환 · 예정 이벤트 (simulate · trace 공통) */
+    private record Prepared(Setup setup, double[] loanPay, List<EngineEvent> events, boolean eligible) {}
+
+    private Prepared prepare(EngineProfile pr, EngineParams params, int t) {
         checkProfile(pr);
 
         Policy pol = params.policy();
@@ -43,8 +78,8 @@ public class SimulationEngine {
         double grossY = pr.grossY() != null ? pr.grossY() : pr.netIncome() * 12 * ui.grossOverNet();
         boolean incomeOk = grossY <= pol.grossMaxY() + 1e-6;
         boolean eligible = pr.age() <= pol.ageMax() && incomeOk;
-        double a1 = eligible ? Math.min(pr.policyM() != null ? pr.policyM() : pr.save(), pol.cap()) : 0;
-        // 배분 합이 저축액을 넘으면 뒤 상품(청약 → 연금저축)을 줄인다
+        // 청년미래도 월 저축액을 넘지 않는다. 배분 합이 저축액을 넘으면 뒤 상품(청약 → 연금저축)을 줄인다
+        double a1 = eligible ? Math.min(Math.min(pr.policyM() != null ? pr.policyM() : pr.save(), pol.cap()), pr.save()) : 0;
         double hm = Math.min(pr.housingM(), Math.max(pr.save() - a1, 0));
         double pm = Math.min(pr.pensionM(), Math.max(pr.save() - a1 - hm, 0));
         boolean dream = pr.age() <= hou.dreamAge() && grossY <= hou.dreamGrossY() + 1e-6;
@@ -55,17 +90,7 @@ public class SimulationEngine {
         List<EngineEvent> events = pr.events().stream()
                 .sorted(Comparator.comparingInt(EngineEvent::t))   // 안정 정렬: 같은 달은 입력 순서대로
                 .toList();
-
-        double[] saved = collect ? new double[n * (t + 1)] : null;
-        byte[][] flags = new byte[Flag.values().length][n];
-        int[] firstBrk = new int[n];
-        double[] matchPaid = new double[n];
-        double[][] tax = new double[TaxItem.values().length][n];
-
-        IntStream.range(0, n).parallel().forEach(p -> runPath(pr, params, noise.noise(p, t), p, t, bufferFirst, setup,
-                loanPay, events, saved, flags, firstBrk, matchPaid, tax));
-
-        return new EngineResult(saved, flags, firstBrk, matchPaid, tax, new Allocation(a1, hm, pm), eligible, n, t);
+        return new Prepared(setup, loanPay, events, eligible);
     }
 
     /**
@@ -89,7 +114,8 @@ public class SimulationEngine {
 
     private void runPath(EngineProfile pr, EngineParams params, PathNoise nz, int p, int bigT, double bufferFirst,
                          Setup su, double[] loanPay, List<EngineEvent> events,
-                         double[] saved, byte[][] flags, int[] firstBrk, double[] matchPaid, double[][] tax) {
+                         double[] saved, byte[][] flags, int[] firstBrk, double[] matchPaid, double[][] tax,
+                         PathTrace.Recorder rec) {
         Stats st = params.stats();
         Policy pol = params.policy();
         General gen = params.general();
@@ -179,6 +205,10 @@ public class SimulationEngine {
         if (saved != null) saved[row] = cash + p1 + g + inv + dep - od;
 
         for (int t = 0; t < bigT; t++) {
+            // 기록(rec)용: 계산에는 쓰지 않는다
+            int ev = 0;
+            double got = 0;
+            double taxBefore = tax[itInterest][p] + tax[itClaw][p] + tax[itPension][p];
             double ageNow = age0 + t / 12.0;
             double expNow = exp0 + t / 12.0;
 
@@ -260,6 +290,7 @@ public class SimulationEngine {
             // 4. 고용
             boolean start = unemp == 0 && volGap == 0 && nz.uOnset()[t] < hazard(st, pr.employment(), ageNow);
             if (start) {
+                ev |= PathTrace.JOB_LOSS;
                 int d = geom(nz.uDur()[t], e, bigT);
                 unemp = d;
                 gapLen = d;
@@ -287,6 +318,8 @@ public class SimulationEngine {
             double income = employed
                     ? base * incomeMult
                     : (uiLeft > 0 ? uiAmt * (uiFirst ? 1 - ui.waitingFrac() : 1) : 0);
+            double salary = base * incomeMult;
+            boolean benefit = !employed && uiLeft > 0;
 
             // 5. 월초 이자 (마이너스·파킹통장). 적금 이자는 납입 뒤
             od *= 1 + rOd;
@@ -315,10 +348,11 @@ public class SimulationEngine {
             // 9. 재가입 → 납입 → 적금 이자
             if (pol.rejoin()) {
                 if (wait > 0) wait -= 1;
-                if (wait == 0 && ageNow <= pol.ageMax() && incomeOk && cumHeld < pol.term()) {
+                if (wait == 0 && ageNow <= pol.ageMax() && incomeOk && cumHeld < pol.term() && employed && od <= thr) {   // 일하는 중이고 빚이 기준 이하일 때만 다시 가입
                     act1 = true;
                     held = 0;
                     flags[Flag.REJOIN.ordinal()][p] = 1;
+                    ev |= PathTrace.REJOIN_POLICY;
                     matchMult = (double) (pol.term() - cumHeld) / pol.term();
                     wait = -1;
                 }
@@ -335,12 +369,14 @@ public class SimulationEngine {
             mp += mNew;
 
             double rest = act1 ? save - a1 : save;
+            double putH = 0;
+            double putP = 0;
             if (su.prodOn()) {   // 청약 → 연금저축 → 일반 적금 순서로 채운다
-                double putH = (can && hact) ? Math.min(hm, Math.max(cash, 0)) : 0;
+                putH = (can && hact) ? Math.min(hm, Math.max(cash, 0)) : 0;
                 cash -= putH;
                 acc[3] += putH;
                 hs.cH = hs.cH + putH;
-                double putP = (can && pact) ? Math.min(pm, Math.max(cash, 0)) : 0;
+                putP = (can && pact) ? Math.min(pm, Math.max(cash, 0)) : 0;
                 cash -= putP;
                 pb += putP;
                 pcT += putP;
@@ -388,6 +424,8 @@ public class SimulationEngine {
             if (act1 && held >= pol.term()) {
                 paid += m1;
                 cash += p1 + m1;
+                got += p1 + m1;
+                ev |= PathTrace.MATURE_POLICY;
                 p1 = 0;
                 c1 = 0;
                 m1 = 0;
@@ -400,7 +438,10 @@ public class SimulationEngine {
             double deficit = Math.max(-cash, 0);
             od += deficit;
             cash = Math.max(cash, 0);
-            if (deficit > 0) flags[Flag.OVERDRAFT.ordinal()][p] = 1;
+            if (deficit > 0) {
+                flags[Flag.OVERDRAFT.ordinal()][p] = 1;
+                ev |= PathTrace.OVERDRAFT;
+            }
 
             // 12. 해지: 일반 적금 먼저, 그다음 청년미래적금
             if (od > thr && g > 0) {
@@ -409,6 +450,8 @@ public class SimulationEngine {
                 double r2 = Math.min(prG, od);
                 od -= r2;
                 cash += prG - r2;
+                got += prG;
+                ev |= PathTrace.BREAK_GENERAL;
                 g = 0;
                 cg = 0;
                 gHeld = 0;
@@ -422,6 +465,8 @@ public class SimulationEngine {
                 double r4 = Math.min(prH, od);
                 od -= r4;
                 cash += prH - r4;
+                got += prH;
+                ev |= PathTrace.BREAK_HOUSING;
                 hs.cH = 0;
                 hs.dM = 0;
                 hact = false;
@@ -443,6 +488,9 @@ public class SimulationEngine {
                 double r3 = Math.min(pr1, od);
                 od -= r3;
                 cash += pr1 - r3;
+                got += pr1;
+                ev |= pr1 <= 0 ? PathTrace.POLICY_RESET
+                        : special ? PathTrace.BREAK_POLICY | PathTrace.BREAK_POLICY_SPECIAL : PathTrace.BREAK_POLICY;
                 p1 = 0;
                 c1 = 0;
                 m1 = 0;
@@ -466,6 +514,8 @@ public class SimulationEngine {
                 double r5 = Math.min(prP, od);
                 od -= r5;
                 cash += prP - r5;
+                got += prP;
+                ev |= PathTrace.BREAK_PENSION;
                 pb = 0;
                 pcT = 0;
                 pcC = 0;
@@ -486,13 +536,23 @@ public class SimulationEngine {
             since += 1;
 
             // 14. 기록 (대출 잔액은 빼지 않는다). 청약·연금은 지금 해지하면 받는 세후 금액으로 센다
-            if (saved != null) {
+            if (saved != null || rec != null) {
                 double v = cash + p1 + g + inv + dep - od;
+                double housingValue = 0;
+                double pensionValue = 0;
                 if (su.prodOn()) {
                     double[] exit = housingExit(hou, hs, su, since <= pol.window(), acc[3]);
-                    v += (hs.cH + exit[0] - exit[1] - exit[2]) + (pb - pensionExitTax(pen, pb, pcT, pcC));
+                    housingValue = hs.cH + exit[0] - exit[1] - exit[2];
+                    pensionValue = pb - pensionExitTax(pen, pb, pcT, pcC);
+                    v += housingValue + pensionValue;
                 }
-                saved[row + t + 1] = v;
+                if (saved != null) saved[row + t + 1] = v;
+                if (rec != null) {
+                    double taxPaid = tax[itInterest][p] + tax[itClaw][p] + tax[itPension][p] - taxBefore;
+                    rec.add(new PathTrace.Month(t, employed, benefit, ev, salary, income, living, shock, lump + depAdd, loanPay[t],
+                            Double.isNaN(refund) ? 0 : refund, mNew, got, taxPaid, put1, putH, putP, putG, putI,
+                            cash, od, p1 + m1, housingValue, pensionValue, g, inv, dep, v, piPrev));
+                }
             }
         }
 

@@ -143,7 +143,7 @@ class SimulationControllerTest {
                         .content("{\"input\":" + s1 + "}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.goal.probability").value(58.0))
-                .andExpect(jsonPath("$.result.tax.interestTax").value(46687))
+                .andExpect(jsonPath("$.result.tax.interestTax").value(46625))
                 .andExpect(jsonPath("$.result.levers.length()").value(3))
                 .andExpect(jsonPath("$.result.comparison.length()").value(0));
     }
