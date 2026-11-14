@@ -11,7 +11,9 @@
 import fnmatch
 import json
 import os
+import re
 import subprocess
+from collections import Counter
 import sys
 import time
 import urllib.error
@@ -22,6 +24,15 @@ MODEL = os.environ.get("GEMINI_MODEL") or "gemini-3.6-flash"
 MAX_DIFF_CHARS = int(os.environ.get("MAX_DIFF_CHARS", "120000"))
 THINKING_LEVEL = os.environ.get("GEMINI_THINKING_LEVEL", "low")  # 빈 값이면 모델 기본값
 TIMEOUT_S = int(os.environ.get("GEMINI_TIMEOUT_S", "300"))
+# diff만 보내면 바뀌지 않은 클래스의 동작을 추측해 오탐이 났다 (review/1111: NoiseSource를 상태 있는 객체로 가정).
+# 그래서 diff가 참조하는 저장소 클래스의 정의와 관련 테스트를 맥락으로 함께 보낸다.
+MAX_CONTEXT_CHARS = int(os.environ.get("MAX_CONTEXT_CHARS", "60000"))
+MAX_CONTEXT_FILE_CHARS = int(os.environ.get("MAX_CONTEXT_FILE_CHARS", "20000"))
+# 정의가 칸을 다 차지해 테스트가 밀려나지 않도록 칸과 분량을 나눈다
+MAX_CONTEXT_DEFS = int(os.environ.get("MAX_CONTEXT_DEFS", "8"))
+MAX_CONTEXT_TESTS = int(os.environ.get("MAX_CONTEXT_TESTS", "4"))
+CONTEXT_TEST_SHARE = 0.4  # 맥락 분량 중 테스트 몫
+TYPE_RE = re.compile(r"\b([A-Z][A-Za-z0-9_]*[a-z][A-Za-z0-9_]*)\b")
 API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 # 리뷰에 보내지 않는 파일. 정답 파일은 기준 구현이 만든 숫자라 사람이 읽을 대상이 아니다
@@ -47,7 +58,10 @@ SYSTEM_PROMPT = """너는 이 저장소의 시니어 백엔드 리뷰어다. 한
 리뷰 방식:
 - 버그, 경계값, 동시성, 보안, 위 규칙 위반, 테스트가 빠진 동작만 지적한다. 스타일·취향·이름 짓기는 지적하지 않는다.
 - 확신이 없으면 "확인 필요"라고 쓰고 무엇을 확인하면 되는지 적는다. 추측을 사실처럼 쓰지 않는다.
-- diff에 없는 코드는 모른다고 가정한다. 보이지 않는 코드에 대해 단정하지 않는다.
+- "참고 파일"은 이번 PR에서 바뀌지 않은 클래스 정의와 관련 테스트다. 바뀐 코드가 다른 클래스의 동작에 기대는 지적을 하기 전에, 참고 파일에서 그 클래스의 실제 구현과 테스트를 먼저 확인한다.
+- 참고 파일로 확인되면 그것을 근거로 판단한다. 기존 테스트가 이미 그 동작을 고정하고 있으면 지적하지 않는다.
+- 참고 파일에도 없는 코드는 모른다고 가정한다. "~라면 문제다" 같은 가정에 기댄 지적은 "확인 필요"로 낮추고 무엇을 확인할지 적는다.
+- 참고 파일 자체의 문제는 이번 PR 범위 밖이라 지적하지 않는다.
 - 최대 8개, 심각한 것부터.
 
 출력 형식 (마크다운):
@@ -58,6 +72,7 @@ SYSTEM_PROMPT = """너는 이 저장소의 시니어 백엔드 리뷰어다. 한
 각 항목:
 **[높음|중간|낮음] `파일경로:줄`** 문제 한 줄
 - 이유:
+- 근거: 확인한 코드나 테스트 (`파일:줄` 또는 테스트 이름). 근거를 못 찾았으면 "확인 필요: 무엇을 보면 되는지"
 - 제안:
 
 지적할 것이 없으면 "### 지적 사항" 아래에 "특별한 문제를 찾지 못했습니다."라고만 쓴다.
@@ -90,7 +105,85 @@ def collect_diff(base, head):
             continue
         included.append(part)
         used += len(part)
-    return "".join(included), skipped, truncated, golden_changed
+    return "".join(included), skipped, truncated, golden_changed, names
+
+
+def collect_context(diff, changed, head):
+    """diff가 참조하는 저장소 클래스의 정의와 관련 테스트를 모은다.
+
+    반환: (참고 파일 텍스트, [(경로, 이유, 잘림 여부)], 상한 때문에 못 넣은 [(경로, 이유)])
+    """
+    java = [f for f in sh("git", "ls-tree", "-r", "--name-only", head).splitlines()
+            if f.endswith(".java") and f.startswith(("src/main/java/", "src/test/java/"))]
+    by_name = {}
+    for f in java:
+        by_name.setdefault(os.path.basename(f)[:-5], []).append(f)
+    changed = set(changed)
+    changed_types = {os.path.basename(f)[:-5] for f in changed if f.endswith(".java")}
+
+    # .java 변경분 본문에서만, 저장소에 실제로 있는 클래스 이름을 센다 (문서에 적힌 이름은 세지 않는다).
+    # JDK 클래스는 저장소에 파일이 없어 자연히 빠진다
+    counts = Counter()
+    in_java = False
+    for line in diff.splitlines():
+        if line.startswith("diff --git"):
+            in_java = line.endswith(".java")
+            continue
+        if not in_java or line.startswith(("index ", "+++", "---", "@@")):
+            continue
+        for name in TYPE_RE.findall(line):
+            if name in by_name and name not in changed_types:
+                counts[name] += 1
+
+    defs = []  # 많이 참조된 클래스 정의부터
+    for name, n in counts.most_common():
+        for f in by_name[name]:
+            if f.startswith("src/main/") and f not in changed:
+                defs.append((f, f"diff에서 `{name}` {n}회 참조"))
+
+    def tests_mentioning(name):
+        try:
+            out = sh("git", "grep", "-l", "-w", name, head, "--", "src/test/java")
+        except subprocess.CalledProcessError:  # 결과 없음
+            return []
+        return [line.split(":", 1)[1] for line in out.splitlines() if ":" in line]
+
+    tests = []  # 바뀐 클래스의 테스트 → 많이 참조된 클래스의 테스트
+    for name in sorted(t for t in changed_types if any(f.startswith("src/main/") for f in by_name.get(t, []))):
+        for f in tests_mentioning(name):
+            tests.append((f, f"바뀐 `{name}`의 테스트"))
+    for name, _ in counts.most_common(5):
+        for f in tests_mentioning(name):
+            tests.append((f, f"참조 `{name}`의 테스트"))
+
+    seen, picked, dropped, parts = set(), [], [], []
+
+    def take(cands, max_files, budget):
+        n, used = 0, 0
+        for path, reason in cands:
+            if path in seen or path in changed:
+                continue
+            seen.add(path)
+            if n >= max_files:
+                dropped.append((path, reason))
+                continue
+            src = sh("git", "show", f"{head}:{path}")
+            cut = len(src) > MAX_CONTEXT_FILE_CHARS
+            if cut:
+                src = src[:MAX_CONTEXT_FILE_CHARS] + f"\n// ... (이하 {len(src) - MAX_CONTEXT_FILE_CHARS:,}자 생략)\n"
+            if used + len(src) > budget:
+                dropped.append((path, reason))
+                continue
+            parts.append(f"#### {path} ({reason})\n```java\n{src}\n```\n")
+            picked.append((path, reason, cut))
+            n, used = n + 1, used + len(src)
+        return used
+
+    test_budget = int(MAX_CONTEXT_CHARS * CONTEXT_TEST_SHARE)
+    used_defs = take(defs, MAX_CONTEXT_DEFS, MAX_CONTEXT_CHARS - test_budget)
+    # 정의가 몫을 다 안 썼으면 남은 분량은 테스트가 쓴다
+    take(tests, MAX_CONTEXT_TESTS, MAX_CONTEXT_CHARS - used_defs)
+    return "".join(parts), picked, dropped
 
 
 def _post(api_key, body, timeout):
@@ -185,18 +278,28 @@ def main():
     head = os.environ.get("HEAD_SHA", "HEAD")
     dry_run = os.environ.get("DRY_RUN") == "1"
 
-    diff, skipped, truncated, golden_changed = collect_diff(base, head)
+    diff, skipped, truncated, golden_changed, changed = collect_diff(base, head)
     print(f"보낼 diff {len(diff):,}자 / 제외 {len(skipped)}개 / 상한 초과 {len(truncated)}개 / 정답 파일 변경 {len(golden_changed)}개")
+    context, ctx_files, ctx_dropped = collect_context(diff, changed, head)
+    print(f"참고 파일 {len(ctx_files)}개 {len(context):,}자 / 상한 때문에 뺀 참고 파일 {len(ctx_dropped)}개")
 
     title = os.environ.get("PR_TITLE", "")
     pr_body = (os.environ.get("PR_BODY") or "")[:3000]
-    user_text = f"PR 제목: {title}\n\nPR 설명:\n{pr_body or '(없음)'}\n\n변경분(diff):\n```diff\n{diff}\n```"
+    user_text = (
+        f"PR 제목: {title}\n\nPR 설명:\n{pr_body or '(없음)'}\n\n"
+        f"변경분(diff):\n```diff\n{diff}\n```\n\n"
+        f"참고 파일 (이번 PR에서 바뀌지 않음. 판단 근거로만 쓰고 이 파일 자체는 리뷰하지 않는다):\n\n{context or '(없음)'}"
+    )
 
     if dry_run:
         print("--- DRY_RUN: API를 부르지 않습니다 ---")
         print("제외:", skipped)
         print("상한 초과:", truncated)
         print("정답 파일:", golden_changed)
+        for path, reason, cut in ctx_files:
+            print(f"참고: {path} — {reason}{' (잘림)' if cut else ''}")
+        for path, reason in ctx_dropped:
+            print(f"참고 못 넣음: {path} — {reason}")
         return
 
     if not diff.strip():
@@ -225,6 +328,11 @@ def main():
     if skipped:
         extra.append("<details><summary>리뷰 대상에서 뺀 파일 " + str(len(skipped)) + "개</summary>\n\n"
                      + "\n".join(f"- `{n}`" for n in skipped) + "\n</details>")
+    if ctx_files or ctx_dropped:
+        lines = [f"- `{p}` — {r}{' (앞부분만)' if c else ''}" for p, r, c in ctx_files]
+        lines += [f"- ~~`{p}`~~ — {r} (분량 상한으로 못 넣음)" for p, r in ctx_dropped]
+        extra.append(f"<details><summary>맥락으로 함께 보낸 참고 파일 {len(ctx_files)}개</summary>\n\n"
+                     + "\n".join(lines) + "\n</details>")
 
     short = head[:7] if len(head) >= 7 else head
     body = "\n\n".join([
