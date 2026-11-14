@@ -1,0 +1,89 @@
+name: Perf
+
+# 배포된 서버(Render)의 응답 시간을 재서 디스코드로 보낸다.
+# 필요한 설정 (Settings → Secrets and variables → Actions)
+#   Variables: PERF_BASE_URL       예) https://capstone-backend.onrender.com
+#   Secrets:   DISCORD_WEBHOOK_URL 디스코드 채널 설정 → 연동 → 웹후크에서 만든 주소
+on:
+  schedule:
+    - cron: '0 0 * * *'   # 매일 오전 9시(KST)
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: '잴 서버 주소 (비우면 PERF_BASE_URL)'
+        required: false
+
+concurrency:
+  group: perf
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  latency:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BASE_URL: ${{ inputs.base_url || vars.PERF_BASE_URL }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check config
+        run: |
+          if [ -z "$BASE_URL" ]; then
+            echo "::error::PERF_BASE_URL 변수(또는 base_url 입력)가 비어 있습니다"
+            exit 1
+          fi
+
+      # 무료 플랜은 15분 동안 요청이 없으면 잠든다. 깨어나는 데 걸리는 시간을 따로 잰다
+      - name: First request (cold start)
+        id: first
+        run: |
+          url="${BASE_URL%/}/api/meta"
+          out=$(curl -s -o /dev/null -w '%{http_code} %{time_total}' --max-time 180 "$url" || echo "000 ")
+          code=${out%% *}; t=${out#* }
+          echo "첫 요청 $url → HTTP $code, ${t}초"
+          # 200이 아니면 깨어난 시간으로 보지 않는다
+          [ "$code" = "200" ] || t=""
+          echo "seconds=$t" >> "$GITHUB_OUTPUT"
+
+      - uses: grafana/setup-k6-action@v1
+
+      - name: Run k6
+        id: k6
+        env:
+          FIRST_REQUEST_S: ${{ steps.first.outputs.seconds }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set +e
+          k6 run perf/k6/api-latency.js
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          cat perf-summary.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Notify Discord
+        if: always() && steps.k6.outcome == 'success'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "::notice::DISCORD_WEBHOOK_URL이 없어 디스코드 알림을 건너뜁니다"
+            exit 0
+          fi
+          curl -fsS -H 'Content-Type: application/json' -d @discord-payload.json "$DISCORD_WEBHOOK_URL"
+
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: perf-result
+          path: |
+            perf-summary.md
+            perf-summary.json
+          retention-days: 30
+
+      # 목표를 넘기면 실행을 실패로 표시한다 (알림은 이미 보냄)
+      - name: Fail on threshold
+        if: steps.k6.outputs.exit_code != '0'
+        run: |
+          echo "::error::응답 시간 목표 초과 또는 요청 실패 (k6 종료 코드 ${{ steps.k6.outputs.exit_code }})"
+          exit 1

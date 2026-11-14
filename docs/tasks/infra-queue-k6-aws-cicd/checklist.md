@@ -1,7 +1,7 @@
 # 체크리스트 (Checklist)
 
 > 작업명: 인프라 — 작업 큐 · k6 부하 테스트 · AWS 배포 · CI/CD
-> 최종 업데이트: 2026-10-10
+> 최종 업데이트: 2026-11-10
 
 ## 합의
 
@@ -20,19 +20,29 @@
 
 ## k6
 
-- [ ] 시나리오 작성 (S1~S3, 동시 사용자 10 → 50 → 100)
-- [ ] 개선 전 측정 → plan.md 표에 기록
+- [x] 응답 시간 측정 스크립트 + 매일 측정·디스코드 알림 (`perf/k6`, `perf.yml`, 2026-11-10)
+- [ ] 부하 시나리오 (S1~S3, 동시 사용자 10 → 50 → 100)
+- [x] 개선 전 측정: Render 무료 (decision.md 표)
+- [ ] EC2 이전 후 같은 조건으로 측정 → 기록
+- [ ] Perf 워크플로: 무료 서버에서 매일 실패 표시할지 결정
 - [ ] 개선 후 같은 조건으로 측정 → 기록
 
 ## AWS
 
-- [ ] 컨테이너 이미지 (API, 워커)
-- [ ] ECS 또는 EC2 배포
+- [x] 컨테이너 이미지 (API) — Dockerfile
+- [ ] 컨테이너 이미지 (워커)
+- [ ] EC2 배포 (t3.small, 시드니) — 설정 순서는 [[setup-aws]]
 - [ ] ElastiCache
-- [ ] 헬스체크 엔드포인트
+- [x] 헬스체크 엔드포인트 (`/actuator/health`, 2026-11-10)
 - [ ] 비밀값 관리 (Secrets Manager / Parameter Store)
 
 ## CI/CD
 
-- [ ] GitHub Actions: 테스트 → 빌드 → ECR → 배포 → 헬스체크 → 롤백
-- [ ] 정답 파일 대조 테스트를 파이프라인에 포함
+- [x] CI: 테스트 → 이미지 빌드 → 컨테이너 헬스체크 (`ci.yml`, 2026-11-10)
+- [x] CD 작성: OIDC → ECR(SHA 태그) → SSM 배포 → 헬스체크 → 자동 롤백 (`deploy.yml`, 2026-11-10)
+- [ ] AWS 설정 (OIDC 역할·정책, ECR, EC2) — [[setup-aws]]
+- [ ] GitHub `production` 환경 변수 + 첫 배포 확인
+- [ ] (선택) production 승인자, main 브랜치 보호
+- [ ] (선택) Trivy 이미지 스캔, Dependabot
+- [x] 정답 파일 대조 테스트를 파이프라인에 포함
+- [ ] (선택) 기준 구현(`finance-simulator-reference`)에서 정답 파일을 다시 만들어 복사본과 비교

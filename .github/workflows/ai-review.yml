@@ -1,0 +1,44 @@
+name: AI Review
+
+# PR 변경분을 Gemini(무료 등급)로 리뷰해 PR 댓글 하나로 남긴다. 참고용이며 PR을 막지 않는다.
+# 필요한 설정 (Settings → Secrets and variables → Actions)
+#   Secrets:   GEMINI_API_KEY  Google AI Studio에서 만든 키
+#   Variables: GEMINI_MODEL    (선택) 기본 gemini-3.6-flash
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# 같은 PR에 새 커밋이 오면 이전 리뷰는 취소하고 최신 커밋만 리뷰한다
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    # 초안 PR과 포크에서 온 PR(시크릿을 못 읽음)은 건너뛴다
+    if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20   # Gemini 1회 최대 5분 × 재시도
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Review with Gemini
+        continue-on-error: true   # 리뷰가 실패해도 PR 체크는 초록불
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+          GEMINI_THINKING_LEVEL: ${{ vars.GEMINI_THINKING_LEVEL || 'low' }}
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          # 제목·본문은 run에 직접 넣지 않고 환경 변수로 넘긴다 (명령 주입 방지)
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: python3 scripts/ai-review/review.py
