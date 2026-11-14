@@ -58,8 +58,10 @@
 ## 계층
 
 ```
-Controller ── 검증(@Valid), 단위 변환(원 ↔ 만 원)
-  └ SimulationService ── seed 관리, 계획별 adjustments 적용, 공통 난수 묶음 계산
+Controller ── 요청 형식만 (@Valid: input 존재·계획 목록 등). 입력 내용은 검증하지 않음
+  └ SimulationService ── 입력 검증(InputValidationService.checkRequired, 단계별 그룹), seed 관리,
+     │                    계획별 adjustments 적용, 공통 난수 묶음 계산
+      ├ ProfileMapper ── 단위 변환 (원 → 만 원, % → 소수)
       ├ Engine ── 월별 14단계 (보고서 6.1), 파이썬 기준 구현 kernel.py를 Java로 이식
       ├ LoanCalculator ── 상환 4종 (repayment-preview와 공유)
       └ ParamsRepository ── params.json (배포 전 고정, 읽기 전용)
