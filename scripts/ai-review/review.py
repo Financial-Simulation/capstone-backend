@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PR 변경분을 Gemini에 보내 리뷰를 받고, PR 댓글 하나로 남긴다 (새 커밋이 오면 같은 댓글을 고친다).
+"""PR 변경분을 Gemini에 보내 리뷰를 받고, 새 PR 댓글로 남긴다 (이전 리뷰 댓글은 지우지 않고 접어 둔다).
 
 - 참고용이다. API 오류·키 없음이어도 실패로 끝내지 않는다 (PR을 막지 않는다).
 - 정답 파일·바이너리·대용량 파일은 보내지 않는다. 정답 파일이 바뀌면 LLM 없이 직접 경고를 붙인다.
@@ -250,19 +250,42 @@ def call_gemini(api_key, user_text):
     return text
 
 
-def upsert_comment(repo, pr, body):
-    comments = json.loads(sh("gh", "api", f"repos/{repo}/issues/{pr}/comments", "--paginate", "--slurp"))
-    flat = [c for page in comments for c in page]
-    mine = [c for c in flat if MARKER in (c.get("body") or "") and c.get("user", {}).get("type") == "Bot"]
+OUTDATED_MARKER = "<!-- ai-review-outdated -->"
+HEADER_RE = re.compile(r"^## AI 코드 리뷰 .*$", re.M)
+
+
+def fold_outdated(old_body):
+    """이전 리뷰 댓글을 한 줄 제목 + 접힌 원문으로 바꾼다. 리뷰 이력은 지우지 않고 남긴다 (전후 비교용)."""
+    m = HEADER_RE.search(old_body)
+    title = m.group(0)[3:] if m else "AI 코드 리뷰"
+    inner = old_body.replace(MARKER, "").strip()
+    return (f"{OUTDATED_MARKER}\n**이전 {title}** — 새 커밋 기준 리뷰가 아래에 새 댓글로 달려 있습니다.\n\n"
+            f"<details><summary>이전 리뷰 펼치기</summary>\n\n{inner}\n\n</details>")
+
+
+def _gh_json(method, path, body):
     payload = "/tmp/ai-review-comment.json"
     with open(payload, "w") as f:
         json.dump({"body": body}, f)
-    if mine:
-        sh("gh", "api", "-X", "PATCH", f"repos/{repo}/issues/comments/{mine[-1]['id']}", "--input", payload)
-        print(f"기존 리뷰 댓글을 고쳤습니다 (id {mine[-1]['id']})")
-    else:
-        sh("gh", "api", "-X", "POST", f"repos/{repo}/issues/{pr}/comments", "--input", payload)
-        print("리뷰 댓글을 새로 달았습니다")
+    return sh("gh", "api", "-X", method, path, "--input", payload)
+
+
+def post_comment(repo, pr, body):
+    """새 리뷰를 새 댓글로 달고, 이전 리뷰 댓글은 접어 둔다."""
+    comments = json.loads(sh("gh", "api", f"repos/{repo}/issues/{pr}/comments", "--paginate", "--slurp"))
+    flat = [c for page in comments for c in page]
+    previous = [c for c in flat if MARKER in (c.get("body") or "") and c.get("user", {}).get("type") == "Bot"]
+
+    # 새 댓글을 먼저 단다. 실패하면 이전 리뷰는 그대로 남는다
+    _gh_json("POST", f"repos/{repo}/issues/{pr}/comments", body)
+    print("리뷰 댓글을 새로 달았습니다")
+
+    for c in previous:
+        try:
+            _gh_json("PATCH", f"repos/{repo}/issues/comments/{c['id']}", fold_outdated(c["body"]))
+            print(f"이전 리뷰 댓글을 접었습니다 (id {c['id']})")
+        except subprocess.CalledProcessError as e:  # 접기 실패는 새 리뷰에 영향 없음
+            print(f"이전 리뷰 접기 실패 (id {c['id']}): {e.stderr[:200]}")
 
 
 def notice(msg):
@@ -348,7 +371,7 @@ def main():
 
     repo, pr = os.environ["GITHUB_REPOSITORY"], os.environ["PR_NUMBER"]
     try:
-        upsert_comment(repo, pr, body)
+        post_comment(repo, pr, body)
     except subprocess.CalledProcessError as e:
         notice(f"댓글 작성 실패: {e.stderr[:300]}")
 

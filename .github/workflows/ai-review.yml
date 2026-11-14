@@ -1,6 +1,6 @@
 name: AI Review
 
-# PR 변경분을 Gemini(무료 등급)로 리뷰해 PR 댓글 하나로 남긴다. 참고용이며 PR을 막지 않는다.
+# PR 변경분을 Gemini(무료 등급)로 리뷰해 새 PR 댓글로 남긴다(이전 리뷰는 접어 둠). 참고용이며 PR을 막지 않는다.
 # 필요한 설정 (Settings → Secrets and variables → Actions)
 #   Secrets:   GEMINI_API_KEY  Google AI Studio에서 만든 키
 #   Variables: GEMINI_MODEL    (선택) 기본 gemini-3.6-flash
