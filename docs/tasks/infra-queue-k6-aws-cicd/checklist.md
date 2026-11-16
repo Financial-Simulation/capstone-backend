@@ -40,7 +40,8 @@
 
 - [x] CI: 테스트 → 이미지 빌드 → 컨테이너 헬스체크 (`ci.yml`, 2026-11-10)
 - [x] CD 작성: OIDC → ECR(SHA 태그) → SSM 배포 → 헬스체크 → 자동 롤백 (`deploy.yml`, 2026-11-10)
-- [ ] AWS 설정 (OIDC 역할·정책, ECR, EC2) — [[setup-aws]]
+- [x] CD 접근 방식 변경: 조직 SCP가 OIDC를 막아 배포 전용 IAM 사용자 액세스 키로 (2026-11-16, [[decision]])
+- [ ] AWS 설정 (배포용 IAM 사용자·정책, ECR, EC2) — [[setup-aws]]
 - [ ] GitHub `production` 환경 변수 + 첫 배포 확인
 - [ ] (선택) production 승인자, main 브랜치 보호
 - [ ] (선택) Trivy 이미지 스캔, Dependabot

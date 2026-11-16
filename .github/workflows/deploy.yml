@@ -2,16 +2,20 @@ name: Deploy
 
 # main에서 CI가 통과하면 EC2에 배포한다. 수동 실행으로 예전 커밋 이미지를 다시 배포(롤백)할 수도 있다.
 #
-# 접근 제어: AWS 키를 저장하지 않는다. 작업마다 GitHub OIDC 토큰으로 IAM 역할의 임시 자격 증명을 받는다.
-#            역할은 이 레포의 production 환경에서만 받을 수 있다 (infra/aws/github-actions-deploy-trust.json).
+# 접근 제어: 배포 전용 IAM 사용자(github-actions-deploy)의 액세스 키를 production 환경 Secret에 둔다.
+#            소속 AWS 조직의 SCP가 OIDC 공급자 생성을 막아서 OIDC 대신 이 방식을 쓴다.
+#            사용자 권한은 infra/aws/github-actions-deploy-policy.json 범위로 제한한다.
 # 증적:      이미지 태그 = 커밋 SHA, ECR 태그 덮어쓰기 금지, SSM 명령 기록, 실행 요약에 배포 기록.
 #
-# 필요한 설정 (Settings → Environments → production → Environment variables)
-#   AWS_REGION       예) ap-southeast-2
-#   AWS_ROLE_ARN     예) arn:aws:iam::123456789012:role/github-actions-deploy
-#   ECR_REPOSITORY   예) capstone-backend
-#   EC2_INSTANCE_ID  예) i-0123456789abcdef0
-#   DEPLOY_BASE_URL  예) http://3.25.0.1
+# 필요한 설정 (Settings → Environments → production)
+#   Environment secrets
+#     AWS_ACCESS_KEY_ID      github-actions-deploy 사용자의 액세스 키 ID
+#     AWS_SECRET_ACCESS_KEY  위 키의 비밀 액세스 키
+#   Environment variables
+#     AWS_REGION       예) ap-southeast-2
+#     ECR_REPOSITORY   예) capstone-backend
+#     EC2_INSTANCE_ID  예) i-0123456789abcdef0
+#     DEPLOY_BASE_URL  예) http://3.25.0.1
 on:
   workflow_run:
     workflows: [CI]
@@ -30,7 +34,6 @@ concurrency:
 
 permissions:
   contents: read
-  id-token: write   # OIDC 토큰 발급
 
 jobs:
   deploy:
@@ -63,9 +66,9 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v5
         with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_REGION }}
-          role-session-name: gha-deploy-${{ github.run_id }}
 
       - uses: aws-actions/amazon-ecr-login@v2
         id: ecr
