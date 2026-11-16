@@ -1,8 +1,8 @@
 name: Perf
 
-# 배포된 서버(Render)의 응답 시간을 재서 디스코드로 보낸다.
+# 배포된 서버(EC2)의 응답 시간을 재서 디스코드로 보낸다. 수동 실행 때 base_url로 다른 서버(예: Render)도 잴 수 있다.
 # 필요한 설정 (Settings → Secrets and variables → Actions)
-#   Variables: PERF_BASE_URL       예) https://capstone-backend.onrender.com
+#   Variables: PERF_BASE_URL       예) http://3.25.0.1 (EC2 탄력적 IP)
 #   Secrets:   DISCORD_WEBHOOK_URL 디스코드 채널 설정 → 연동 → 웹후크에서 만든 주소
 on:
   schedule:
