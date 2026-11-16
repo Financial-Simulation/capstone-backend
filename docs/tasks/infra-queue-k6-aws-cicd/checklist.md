@@ -31,7 +31,7 @@
 
 - [x] 컨테이너 이미지 (API) — Dockerfile
 - [ ] 컨테이너 이미지 (워커)
-- [ ] EC2 배포 (t3.small, 시드니) — 설정 순서는 [[setup-aws]]
+- [x] EC2 배포 (t3.small, 시드니) — 설정 순서는 [[setup-aws]] (2026-11-16)
 - [ ] ElastiCache
 - [x] 헬스체크 엔드포인트 (`/actuator/health`, 2026-11-10)
 - [ ] 비밀값 관리 (Secrets Manager / Parameter Store)
@@ -41,8 +41,8 @@
 - [x] CI: 테스트 → 이미지 빌드 → 컨테이너 헬스체크 (`ci.yml`, 2026-11-10)
 - [x] CD 작성: OIDC → ECR(SHA 태그) → SSM 배포 → 헬스체크 → 자동 롤백 (`deploy.yml`, 2026-11-10)
 - [x] CD 접근 방식 변경: 조직 SCP가 OIDC를 막아 배포 전용 IAM 사용자 액세스 키로 (2026-11-16, [[decision]])
-- [ ] AWS 설정 (배포용 IAM 사용자·정책, ECR, EC2) — [[setup-aws]]
-- [ ] GitHub `production` 환경 변수 + 첫 배포 확인
+- [x] AWS 설정 (배포용 IAM 사용자·정책, ECR, EC2) — [[setup-aws]] (2026-11-16)
+- [x] GitHub `production` 환경 변수 + 첫 배포 확인 (2026-11-16, 수동 실행 `cc04418`)
 - [ ] (선택) production 승인자, main 브랜치 보호
 - [ ] (선택) Trivy 이미지 스캔, Dependabot
 - [x] 정답 파일 대조 테스트를 파이프라인에 포함
