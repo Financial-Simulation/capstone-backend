@@ -2,6 +2,8 @@ package com.example.capstoneserver.input.dto;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.capstoneserver.input.InputValidationService;
+import com.example.capstoneserver.loan.LoanCalculator;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -113,6 +115,20 @@ class SimulationInputValidationTest {
         // 비과세 식대를 뺀 총급여처럼 실수령 × 12보다 조금 작은 값은 통과 (10% 여유)
         String edge = S1.replace("\"monthlyNetIncome\": 2500000 }", "\"monthlyNetIncome\": 2500000, \"annualGrossSalary\": 27300000 }");
         assertThat(validate(edge, InputStep.ALL)).isEmpty();
+    }
+
+    @Test
+    void 청년미래가_월_저축액보다_크면_월_저축액까지만_넣는다() {
+        // 엔진과 같은 규칙: 월 저축 20만 원에 청년미래 50만 원 → 청년미래 20만 원, 일반 적금 0원
+        String json = S1.replace("\"monthlySaving\": 500000", "\"monthlySaving\": 200000")
+                .replace("\"emergencyFirstAmount\": 0 }", "\"emergencyFirstAmount\": 0, \"policyMonthly\": 500000 }");
+        SimulationInput input = jsonMapper.readValue(json, SimulationInput.class);
+
+        ValidateResponse.PolicySaving policy = new InputValidationService(validator, new LoanCalculator())
+                .validate(InputStep.ALL, input).policySaving();
+
+        assertThat(policy.policyMonthly()).isEqualTo(200000L);
+        assertThat(policy.generalMonthly()).isEqualTo(0L);
     }
 
     private Map<String, String> validate(String json, InputStep step) {

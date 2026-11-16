@@ -8,6 +8,7 @@ import com.example.capstoneserver.simulation.dto.RecommendResponse;
 import com.example.capstoneserver.simulation.dto.ReverseResponse;
 import com.example.capstoneserver.simulation.dto.RobustResponse;
 import com.example.capstoneserver.simulation.dto.SimulateResponse;
+import com.example.capstoneserver.simulation.dto.StoryResponse;
 import com.example.capstoneserver.simulation.dto.SimulationRequests;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,11 @@ public class SimulationController {
     @PostMapping("/simulate")
     public ApiResponse<SimulateResponse> simulate(@Valid @RequestBody SimulationRequests.Simulate request) {
         return ApiResponse.onSuccess(simulationService.simulate(request.input(), request.seed()));
+    }
+
+    @PostMapping("/simulate/story")
+    public ApiResponse<StoryResponse> story(@Valid @RequestBody SimulationRequests.Story request) {
+        return ApiResponse.onSuccess(simulationService.story(request.input(), request.seed()));
     }
 
     @PostMapping("/simulate/preview")

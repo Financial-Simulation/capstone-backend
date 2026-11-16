@@ -19,6 +19,12 @@ public final class SimulationRequests {
             Long seed
     ) {}
 
+    /** 미래 다시 보기 (데모): 상위 5% · 가운데 · 하위 5% 미래를 달마다 */
+    public record Story(
+            @NotNull(message = "입력을 보내 주세요") SimulationInput input,
+            Long seed
+    ) {}
+
     public record Preview(
             @NotNull(message = "입력을 보내 주세요") SimulationInput input,
             @NotNull(message = "바꿀 값을 하나 이상 보내 주세요") Adjustments adjustments,
