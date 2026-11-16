@@ -71,7 +71,7 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
-      # Render가 쓰는 것과 같은 Dockerfile로 이미지를 만든다. 푸시는 하지 않는다
+      # 배포(EC2)와 같은 Dockerfile로 이미지를 만든다. 푸시는 하지 않는다
       - name: Build image
         uses: docker/build-push-action@v6
         with:

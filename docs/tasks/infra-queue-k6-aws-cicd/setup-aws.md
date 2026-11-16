@@ -1,7 +1,7 @@
 # AWS 배포 설정 순서 (Setup)
 
 > 작업명: 인프라 — CI/CD
-> 최종 업데이트: 2026-11-10
+> 최종 업데이트: 2026-11-16
 > 결정 이유는 [[decision]], 남은 일은 [[checklist]]
 
 처음 한 번만 하면 된다. 이후에는 main에 머지하면 자동으로 배포된다.
@@ -12,7 +12,7 @@
 main에 머지
   → CI (.github/workflows/ci.yml): 테스트(정답 파일 대조) → 이미지 빌드 → 컨테이너 헬스체크
   → Deploy (.github/workflows/deploy.yml)
-      1. GitHub OIDC로 AWS 임시 권한 받기 (저장된 키 없음)
+      1. 배포 전용 IAM 사용자의 액세스 키로 AWS 접근 (production 환경 Secret)
       2. 이미지를 ECR에 푸시 (태그 = 커밋 SHA, 덮어쓰기 금지)
       3. SSM으로 EC2에 배포 스크립트 전송 (scripts/deploy/ec2-deploy.sh)
          → 새 컨테이너 헬스체크 실패 시 이전 이미지로 자동 롤백
@@ -34,7 +34,7 @@ main에 머지
 
 - [ ] 루트 계정 MFA: 오른쪽 위 계정 이름 → 보안 자격 증명 → MFA 할당
 - [ ] 예산 알림: Budgets → 예산 생성 → 월별 비용 예산 $5 → 이메일
-- [ ] **액세스 키는 만들지 않는다** (OIDC를 쓴다)
+- [ ] 액세스 키는 5번의 배포 전용 사용자 것만 만든다 (루트·관리자 키는 만들지 않는다)
 
 ## 2. ECR 저장소
 
@@ -70,24 +70,42 @@ EC2 → 인스턴스 시작
 이미 만든 인스턴스의 유형만 바꿀 때: 중지 → 작업 → 인스턴스 설정 → 인스턴스 유형 변경 → 시작.
 x86 인스턴스는 ARM 유형(t4g)으로 바꿀 수 없다 (OS가 다름).
 
-## 5. GitHub OIDC
+## 5. 배포용 IAM 사용자
 
-1. [ ] IAM → 자격 증명 공급자 → 공급자 추가
-   - OpenID Connect, URL `https://token.actions.githubusercontent.com`, 대상 `sts.amazonaws.com`
-2. [ ] IAM → 역할 → 역할 생성 → 웹 자격 증명 → 위 공급자 선택 → 이름 `github-actions-deploy`
-3. [ ] 역할 → 신뢰 관계 → 신뢰 정책 편집 → [`infra/aws/github-actions-deploy-trust.json`](../../../infra/aws/github-actions-deploy-trust.json) 내용으로 통째로 교체
-   - 이 레포의 `production` 환경에서 도는 작업만 역할을 받을 수 있다
-4. [ ] 역할 → 권한 추가 → 인라인 정책 생성 → JSON → [`infra/aws/github-actions-deploy-policy.json`](../../../infra/aws/github-actions-deploy-policy.json) 붙여 넣기 → 이름 `deploy`
+원래는 GitHub OIDC를 쓰려 했지만, 이 계정이 속한 AWS 조직의 SCP가 OIDC 공급자 생성을 막는다 (이유는 [[decision]]).
+그래서 배포 전용 IAM 사용자의 액세스 키를 쓴다. CloudShell(콘솔 오른쪽 위 `>_`)에서:
+
+1. [ ] 사용자 만들기
+   ```bash
+   aws iam create-user --user-name github-actions-deploy
+   ```
+2. [ ] 권한 붙이기: [`infra/aws/github-actions-deploy-policy.json`](../../../infra/aws/github-actions-deploy-policy.json) 내용을 `policy.json`으로 저장한 뒤
+   ```bash
+   aws iam put-user-policy --user-name github-actions-deploy --policy-name deploy --policy-document file://policy.json
+   ```
    - ECR은 `capstone-backend` 저장소만, 명령은 이름 태그가 `capstone-backend`인 인스턴스에만
+3. [ ] 액세스 키 만들기 (비밀 키는 이때 한 번만 보인다)
+   ```bash
+   aws iam create-access-key --user-name github-actions-deploy
+   ```
+   - `AccessKeyId`, `SecretAccessKey`를 6번 Secret에 넣고, 화면·메모에서 지운다
 
 ## 6. GitHub 설정
 
-레포 Settings → Environments → New environment → `production` → Environment variables
+레포 Settings → Environments → New environment → `production`
+
+**Environment secrets**
+
+| 이름 | 값 |
+|---|---|
+| `AWS_ACCESS_KEY_ID` | 5-3의 `AccessKeyId` |
+| `AWS_SECRET_ACCESS_KEY` | 5-3의 `SecretAccessKey` |
+
+**Environment variables** (Secret이 아니라 Variable에 넣는다. 워크플로가 `vars.*`로 읽는다)
 
 | 이름 | 값 |
 |---|---|
 | `AWS_REGION` | `ap-southeast-2` |
-| `AWS_ROLE_ARN` | `arn:aws:iam::260172549184:role/github-actions-deploy` |
 | `ECR_REPOSITORY` | `capstone-backend` |
 | `EC2_INSTANCE_ID` | `i-...` |
 | `DEPLOY_BASE_URL` | `http://<탄력적 IP>` |
@@ -122,7 +140,8 @@ x86 인스턴스는 ARM 유형(t4g)으로 바꿀 수 없다 (OS가 다름).
 | 증상 | 확인할 것 |
 |---|---|
 | Deploy가 "환경 변수가 비어 있다"로 실패 | 6번 `production` 환경 변수 |
-| `Not authorized to perform sts:AssumeRoleWithWebIdentity` | 신뢰 정책이 `environment:production`인지 (5-3) |
+| `Credentials could not be loaded` | 6번 Secret `AWS_ACCESS_KEY_ID`·`AWS_SECRET_ACCESS_KEY`가 `production` 환경에 있는지 |
+| ECR·SSM `AccessDenied` | 5-2 정책이 사용자에 붙었는지 (`aws iam list-user-policies --user-name github-actions-deploy`) |
 | `ssm:SendCommand` 권한 거부 | 인스턴스 이름 태그가 정확히 `capstone-backend`인지 |
 | SSM 명령이 계속 Pending | Fleet Manager에서 인스턴스가 온라인인지, `capstone-ec2-role`이 붙었는지 |
 | 서버 안 헬스체크는 통과, 외부 헬스체크 실패 | 보안 그룹 HTTP(80) 규칙 |

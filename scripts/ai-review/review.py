@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PR 변경분을 Gemini에 보내 리뷰를 받고, PR 댓글 하나로 남긴다 (새 커밋이 오면 같은 댓글을 고친다).
+"""PR 변경분을 Gemini에 보내 리뷰를 받고, 새 PR 댓글로 남긴다 (이전 리뷰 댓글은 지우지 않고 접어 둔다).
 
 - 참고용이다. API 오류·키 없음이어도 실패로 끝내지 않는다 (PR을 막지 않는다).
 - 정답 파일·바이너리·대용량 파일은 보내지 않는다. 정답 파일이 바뀌면 LLM 없이 직접 경고를 붙인다.
@@ -44,19 +44,21 @@ EXCLUDE = [
 ]
 GOLDEN_PREFIX = "src/test/resources/golden/"
 
+# 저장소 설계 설명. 리뷰 기준(규칙·흐름·오탐 주의점)은 스크립트가 아니라 이 문서에서 관리한다.
+# review/1111 재리뷰에서 "@Valid 누락"(검증은 서비스의 checkRequired가 함), "NoiseSource 상태"(호출마다 새로 생성)
+# 오탐이 남아, 파일 조각 대신 시스템 전체 흐름을 먼저 알려 주기로 했다.
+SYSTEM_CONTEXT_PATH = "docs/architecture/review-context.md"
+FALLBACK_CONTEXT = """사회초년생 금융 시뮬레이터 백엔드 (Spring Boot 4, Java 21). 입력을 저장하지 않는다(NFR-06).
+계산은 기준 구현과 정답 파일(golden.json, analysis_golden.json)로 대조한다. 난수는 sfc32. 금액은 API 원 / 엔진 만 원."""
+
 SYSTEM_PROMPT = """너는 이 저장소의 시니어 백엔드 리뷰어다. 한국어로 답한다.
 
-저장소: 사회초년생 금융 시뮬레이터 백엔드 (Spring Boot 4, Java 21, Gradle).
-꼭 지켜야 하는 규칙:
-- 서버는 사용자 입력을 저장하지 않는다 (NFR-06). 로그·캐시·파일·DB에 입력값이 남으면 문제다.
-- 계산 엔진은 기준 구현(Python/JS)과 정답 파일(golden.json, analysis_golden.json)로 대조한다. 계산 결과가 바뀌는 변경은 정답 파일 재생성 근거가 있어야 한다.
-- 난수는 sfc32이며 호출 순서가 바뀌면 확률·분위수가 전부 달라진다.
-- 금액 단위(원 / 만 원)와 연이율(소수 / 퍼센트) 변환 실수를 특히 본다.
-- 경로 수(2,000)와 기간은 보고서 기준이라 바꾸면 안 된다.
-- 응답 시간 목표: /simulate 1초, /compare·/reverse 3초 (NFR-03). 엔진은 경로를 parallel()로 계산한다.
+맨 아래 "시스템 설명"이 이 저장소의 실제 설계다. 리뷰 전에 먼저 읽는다.
+- 설명과 다르게 동작하는 변경(예: 새 계산 API가 checkRequired를 부르지 않음, 같은 경로를 다른 기간으로 비교)을 찾는다.
+- 설명에 "일부러 이렇게 한다"고 적힌 설계는 지적하지 않는다.
 
 리뷰 방식:
-- 버그, 경계값, 동시성, 보안, 위 규칙 위반, 테스트가 빠진 동작만 지적한다. 스타일·취향·이름 짓기는 지적하지 않는다.
+- 버그, 경계값, 동시성, 보안, 시스템 설명의 규칙 위반, 테스트가 빠진 동작만 지적한다. 스타일·취향·이름 짓기는 지적하지 않는다.
 - 확신이 없으면 "확인 필요"라고 쓰고 무엇을 확인하면 되는지 적는다. 추측을 사실처럼 쓰지 않는다.
 - "참고 파일"은 이번 PR에서 바뀌지 않은 클래스 정의와 관련 테스트다. 바뀐 코드가 다른 클래스의 동작에 기대는 지적을 하기 전에, 참고 파일에서 그 클래스의 실제 구현과 테스트를 먼저 확인한다.
 - 참고 파일로 확인되면 그것을 근거로 판단한다. 기존 테스트가 이미 그 동작을 고정하고 있으면 지적하지 않는다.
@@ -72,11 +74,21 @@ SYSTEM_PROMPT = """너는 이 저장소의 시니어 백엔드 리뷰어다. 한
 각 항목:
 **[높음|중간|낮음] `파일경로:줄`** 문제 한 줄
 - 이유:
-- 근거: 확인한 코드나 테스트 (`파일:줄` 또는 테스트 이름). 근거를 못 찾았으면 "확인 필요: 무엇을 보면 되는지"
+- 근거: 확인한 코드나 테스트 (`파일:줄` 또는 테스트 이름)와 **그 줄의 코드를 원문 그대로 한 줄 인용**. 인용한 코드가 지적 내용을 실제로 뒷받침하는지 다시 확인하고, 아니면 지적을 빼거나 "확인 필요"로 낮춘다. 근거를 못 찾았으면 "확인 필요: 무엇을 보면 되는지"
 - 제안:
 
 지적할 것이 없으면 "### 지적 사항" 아래에 "특별한 문제를 찾지 못했습니다."라고만 쓴다.
 """
+
+
+def load_system_prompt():
+    """리뷰 규칙 + 저장소 시스템 설명. 설명 문서가 없으면 짧은 기본 설명을 쓴다."""
+    try:
+        with open(SYSTEM_CONTEXT_PATH, encoding="utf-8") as f:
+            context, source = f.read(), SYSTEM_CONTEXT_PATH
+    except OSError:
+        context, source = FALLBACK_CONTEXT, "기본 설명 (문서 없음)"
+    return f"{SYSTEM_PROMPT}\n\n---\n시스템 설명 ({source}):\n\n{context}", source
 
 
 def sh(*args):
@@ -197,13 +209,13 @@ def _post(api_key, body, timeout):
         return json.load(res)
 
 
-def call_gemini(api_key, user_text):
+def call_gemini(api_key, user_text, system_prompt):
     gen_config = {"maxOutputTokens": 8192}
     # 리뷰에는 깊은 추론이 필요 없다. 기본값으로 두면 오래 생각하다 시간 초과가 났다 (PR #6)
     if THINKING_LEVEL:
         gen_config["thinkingConfig"] = {"thinkingLevel": THINKING_LEVEL}
     body = {
-        "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+        "systemInstruction": {"parts": [{"text": system_prompt}]},
         "contents": [{"role": "user", "parts": [{"text": user_text}]}],
         "generationConfig": gen_config,
     }
@@ -250,19 +262,42 @@ def call_gemini(api_key, user_text):
     return text
 
 
-def upsert_comment(repo, pr, body):
-    comments = json.loads(sh("gh", "api", f"repos/{repo}/issues/{pr}/comments", "--paginate", "--slurp"))
-    flat = [c for page in comments for c in page]
-    mine = [c for c in flat if MARKER in (c.get("body") or "") and c.get("user", {}).get("type") == "Bot"]
+OUTDATED_MARKER = "<!-- ai-review-outdated -->"
+HEADER_RE = re.compile(r"^## AI 코드 리뷰 .*$", re.M)
+
+
+def fold_outdated(old_body):
+    """이전 리뷰 댓글을 한 줄 제목 + 접힌 원문으로 바꾼다. 리뷰 이력은 지우지 않고 남긴다 (전후 비교용)."""
+    m = HEADER_RE.search(old_body)
+    title = m.group(0)[3:] if m else "AI 코드 리뷰"
+    inner = old_body.replace(MARKER, "").strip()
+    return (f"{OUTDATED_MARKER}\n**이전 {title}** — 새 커밋 기준 리뷰가 아래에 새 댓글로 달려 있습니다.\n\n"
+            f"<details><summary>이전 리뷰 펼치기</summary>\n\n{inner}\n\n</details>")
+
+
+def _gh_json(method, path, body):
     payload = "/tmp/ai-review-comment.json"
     with open(payload, "w") as f:
         json.dump({"body": body}, f)
-    if mine:
-        sh("gh", "api", "-X", "PATCH", f"repos/{repo}/issues/comments/{mine[-1]['id']}", "--input", payload)
-        print(f"기존 리뷰 댓글을 고쳤습니다 (id {mine[-1]['id']})")
-    else:
-        sh("gh", "api", "-X", "POST", f"repos/{repo}/issues/{pr}/comments", "--input", payload)
-        print("리뷰 댓글을 새로 달았습니다")
+    return sh("gh", "api", "-X", method, path, "--input", payload)
+
+
+def post_comment(repo, pr, body):
+    """새 리뷰를 새 댓글로 달고, 이전 리뷰 댓글은 접어 둔다."""
+    comments = json.loads(sh("gh", "api", f"repos/{repo}/issues/{pr}/comments", "--paginate", "--slurp"))
+    flat = [c for page in comments for c in page]
+    previous = [c for c in flat if MARKER in (c.get("body") or "") and c.get("user", {}).get("type") == "Bot"]
+
+    # 새 댓글을 먼저 단다. 실패하면 이전 리뷰는 그대로 남는다
+    _gh_json("POST", f"repos/{repo}/issues/{pr}/comments", body)
+    print("리뷰 댓글을 새로 달았습니다")
+
+    for c in previous:
+        try:
+            _gh_json("PATCH", f"repos/{repo}/issues/comments/{c['id']}", fold_outdated(c["body"]))
+            print(f"이전 리뷰 댓글을 접었습니다 (id {c['id']})")
+        except subprocess.CalledProcessError as e:  # 접기 실패는 새 리뷰에 영향 없음
+            print(f"이전 리뷰 접기 실패 (id {c['id']}): {e.stderr[:200]}")
 
 
 def notice(msg):
@@ -282,6 +317,8 @@ def main():
     print(f"보낼 diff {len(diff):,}자 / 제외 {len(skipped)}개 / 상한 초과 {len(truncated)}개 / 정답 파일 변경 {len(golden_changed)}개")
     context, ctx_files, ctx_dropped = collect_context(diff, changed, head)
     print(f"참고 파일 {len(ctx_files)}개 {len(context):,}자 / 상한 때문에 뺀 참고 파일 {len(ctx_dropped)}개")
+    system_prompt, ctx_source = load_system_prompt()
+    print(f"시스템 설명: {ctx_source} (프롬프트 {len(system_prompt):,}자)")
 
     title = os.environ.get("PR_TITLE", "")
     pr_body = (os.environ.get("PR_BODY") or "")[:3000]
@@ -312,7 +349,7 @@ def main():
         return
 
     try:
-        review = call_gemini(api_key, user_text)
+        review = call_gemini(api_key, user_text, system_prompt)
     except Exception as e:  # 참고용 리뷰라 실패해도 PR을 막지 않는다
         notice(f"AI 리뷰 실패 (PR에는 영향 없음): {e}")
         return
@@ -331,7 +368,8 @@ def main():
     if ctx_files or ctx_dropped:
         lines = [f"- `{p}` — {r}{' (앞부분만)' if c else ''}" for p, r, c in ctx_files]
         lines += [f"- ~~`{p}`~~ — {r} (분량 상한으로 못 넣음)" for p, r in ctx_dropped]
-        extra.append(f"<details><summary>맥락으로 함께 보낸 참고 파일 {len(ctx_files)}개</summary>\n\n"
+        dropped_note = f", 분량 상한으로 못 넣은 파일 {len(ctx_dropped)}개" if ctx_dropped else ""
+        extra.append(f"<details><summary>맥락으로 함께 보낸 참고 파일 {len(ctx_files)}개{dropped_note}</summary>\n\n"
                      + "\n".join(lines) + "\n</details>")
 
     short = head[:7] if len(head) >= 7 else head
@@ -343,12 +381,12 @@ def main():
         "---",
         "<sub>참고용 자동 리뷰입니다. 틀릴 수 있으니 확인 후 반영하고, 머지 판단은 사람이 합니다. "
         "변경분은 Google Gemini API(무료 등급)로 전송되며, 무료 등급 입력은 Google 제품 개선에 쓰일 수 있습니다. "
-        "설정: `scripts/ai-review/review.py`</sub>",
+        f"시스템 설명: `{ctx_source}` · 설정: `scripts/ai-review/review.py`</sub>",
     ])
 
     repo, pr = os.environ["GITHUB_REPOSITORY"], os.environ["PR_NUMBER"]
     try:
-        upsert_comment(repo, pr, body)
+        post_comment(repo, pr, body)
     except subprocess.CalledProcessError as e:
         notice(f"댓글 작성 실패: {e.stderr[:300]}")
 

@@ -80,6 +80,12 @@
   - 신뢰 조건을 `ref:refs/heads/main`으로: 배포 작업이 `environment`를 쓰면 토큰의 `sub`가 환경 기준으로 바뀌어 맞지 않는다. 환경 기준이 범위도 더 좁다 → 환경 기준으로
   - 정책에 인스턴스 ID를 직접 적기: 인스턴스를 다시 만들 때마다 정책 수정 → 이름 태그 조건으로
 
+### 접근 제어 변경: OIDC → 배포 전용 IAM 사용자 액세스 키 (2026-11-16)
+- 결정: GitHub Actions는 IAM 사용자 `github-actions-deploy`의 액세스 키(production 환경 Secret)로 AWS에 접근한다. 권한은 위와 같은 `infra/aws/github-actions-deploy-policy.json`을 인라인 정책으로 붙인다. SSM 배포는 그대로.
+- 이유: 이 계정은 AWS 조직(관리 계정 449589576054)의 멤버이고, 조직 SCP가 `iam:CreateOpenIDConnectProvider`·`iam:ListOpenIDConnectProviders`를 명시적으로 거부한다. 멤버 계정에서는 풀 수 없다. IAM 사용자 생성은 허용된다.
+- 보완: 권한을 배포에 필요한 범위로 제한, 키는 production 환경 Secret에만 저장(이 환경에서 도는 작업만 읽음), 유출이 의심되면 키를 비활성화하고 새로 발급한다.
+- 조직 관리자가 OIDC를 허용하면 위 OIDC 방식으로 되돌린다 (`infra/aws/github-actions-deploy-trust.json`은 그때를 위해 남겨 둔다).
+
 ### 증적과 롤백 (2026-11-10)
 - 결정:
   - 이미지 태그는 커밋 SHA 12자리, ECR 태그 변경 불가(Immutable). 같은 SHA 이미지가 있으면 빌드를 건너뛰고 배포만 한다.
