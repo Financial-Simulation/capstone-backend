@@ -27,17 +27,21 @@ class ExampleControllerTest {
     InputValidationService inputValidationService;
 
     @Test
-    void 예시_3개를_돌려준다() throws Exception {
+    void 예시_4개를_돌려준다() throws Exception {
         mockMvc.perform(get("/api/examples"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("COMMON200"))
-                .andExpect(jsonPath("$.result.examples.length()").value(3))
+                .andExpect(jsonPath("$.result.examples.length()").value(4))
                 .andExpect(jsonPath("$.result.examples[0].key").value("S1"))
                 .andExpect(jsonPath("$.result.examples[0].label").value("27세 개발자"))
                 .andExpect(jsonPath("$.result.examples[0].input.income.monthlyNetIncome").value(2_500_000))
                 .andExpect(jsonPath("$.result.examples[1].input.loans.items[0].principal").value(8_000_000))
                 .andExpect(jsonPath("$.result.examples[2].input.person.employmentType").value("CONTRACT"))
                 .andExpect(jsonPath("$.result.examples[2].input.events[0].eventType").value("MOVE"))
+                .andExpect(jsonPath("$.result.examples[0].eligibility").doesNotExist())
+                .andExpect(jsonPath("$.result.examples[3].key").value("S4"))
+                .andExpect(jsonPath("$.result.examples[3].input.expenses.monthlyRent").value(450_000))
+                .andExpect(jsonPath("$.result.examples[3].eligibility.livingApart").value(true))
                 // 계산용 도우미 값(resolvedTotal 등)이 응답에 섞여 나오면 안 됨
                 .andExpect(jsonPath("$.result.examples[0].input.expenses.fixed.resolvedTotal").doesNotExist())
                 .andExpect(jsonPath("$.result.examples[0].input.expenses.fixed.resolvedTotalInRange").doesNotExist());

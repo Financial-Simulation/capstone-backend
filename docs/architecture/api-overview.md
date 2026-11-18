@@ -16,7 +16,9 @@
 |---|---|---|---|---|
 | POST | `/api/inputs/validate` | 동기 | — | 입력 단계별 검사. 오류·경고·확정 합계 (저장 없음) |
 | POST | `/api/loans/repayment-preview` | 동기 | — | 대출 한 건의 월 상환액 (`LoanCalculator` 공유) |
-| POST | `/api/simulate` | 동기 | 1초 | 기본 결과: 확률·범위·위험·원인·확정 계산·첫 문장 |
+| POST | `/api/simulate` | 동기 | 1초 | 기본 결과: 확률·범위·위험·원인·확정 계산·첫 문장. `adjustments`(선택)를 주면 바꾼 계획으로 |
+| POST | `/api/simulate/story` | 동기 | — | 미래 다시 보기: 최상·중간·최악 경로 하나씩의 월별 기록과 사건. `adjustments`(선택) |
+| POST | `/api/benefits` | 동기 | — | 받을 수 있는 혜택: 청년 정책 판정(`benefits.json`) + 받으면 목표 달성 가능성 변화. `eligibility`(선택 질문 답) |
 | POST | `/api/simulate/preview` | 동기 | 1초 | 조절 막대: 지금 계획 vs 바꾼 계획 1개 |
 | POST | `/api/compare` | 동기 | 3초 | 지금 계획 + 비교 계획 1~3개, 짝지은 검정 |
 | POST | `/api/reverse` | 동기 | 3초 | 역산(필요 지출 조정·저축액·기간), 비상금 전략, 개선 포인트 |
@@ -26,7 +28,7 @@
 | POST | `/api/reports` | 동기 | — | 리포트 데이터 (simulate·reverse·compare 묶음, v1.7에서 구현) |
 | GET | `/api/meta` | 동기 | 즉시 | 파라미터 20개 + 근거 등급·출처 (FR-10) |
 | GET | `/api/events/presets` | 동기 | 즉시 | 예정된 일 프리셋 5종 |
-| GET | `/api/examples` | 동기 | 즉시 | S1~S3 예시 입력 (프론트 상수로 대체 가능) |
+| GET | `/api/examples` | 동기 | 즉시 | S1~S4 예시 입력, S4는 혜택 질문 답 포함 (프론트 상수로 대체 가능) |
 
 ## 흐름
 

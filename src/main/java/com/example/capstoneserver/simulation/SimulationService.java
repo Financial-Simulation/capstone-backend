@@ -43,15 +43,49 @@ public class SimulationService {
     private final StoryAnalyzer storyAnalyzer;
 
     public SimulateResponse simulate(SimulationInput input, Long seed) {
+        return simulate(input, null, seed);
+    }
+
+    /**
+     * adjustments가 있으면 바꾼 계획으로 계산한다 (결과 화면 '계획 바꿔 보기' 막대를 움직이면 그래프 전체를 다시 그린다).
+     * null이면 입력 그대로. 같은 seed라 지금 계획과 같은 미래로 계산한다.
+     */
+    public SimulateResponse simulate(SimulationInput input, Adjustments adjustments, Long seed) {
         inputValidationService.checkRequired(input);
-        var warnings = inputValidationService.validate(InputStep.ALL, input).warnings();
-        return analyzer.simulate(input, profileMapper.toPlan(input), seedOf(seed), warnings);
+        SimulationInput used = adjustments == null ? input : adjust(input, adjustments);
+        var warnings = inputValidationService.validate(InputStep.ALL, used).warnings();
+        return analyzer.simulate(used, profileMapper.toPlan(used), seedOf(seed), warnings);
     }
 
     /** 미래 다시 보기 (데모): /simulate와 같은 미래 중 상위 5% · 가운데 · 하위 5%를 달마다 */
     public StoryResponse story(SimulationInput input, Long seed) {
+        return story(input, null, seed);
+    }
+
+    /** adjustments가 있으면 바꾼 계획의 미래를 다시 본다 */
+    public StoryResponse story(SimulationInput input, Adjustments adjustments, Long seed) {
         inputValidationService.checkRequired(input);
-        return storyAnalyzer.story(profileMapper.toPlan(input), input.startMonth(), seedOf(seed));
+        SimulationInput used = adjustments == null ? input : adjust(input, adjustments);
+        return storyAnalyzer.story(profileMapper.toPlan(used), used.startMonth(), seedOf(seed));
+    }
+
+    /** 혜택 화면: adjustments(결과 화면 막대)를 적용하고 검사까지 한 입력. null이면 입력 그대로 */
+    public SimulationInput resolve(SimulationInput input, Adjustments adjustments) {
+        inputValidationService.checkRequired(input);
+        return adjustments == null ? input : adjust(input, adjustments);
+    }
+
+    /**
+     * 정책으로 들어오는 돈(extra, 지출 변화 이벤트)을 더했을 때의 목표 달성 가능성 %.
+     * resolve()를 거친 입력을 받는다. extra는 서버가 만든 이벤트라 입력 칸 검사(EVENT4xxx)를 하지 않는다.
+     * 같은 seed라 extra가 없으면 /simulate의 goal.probability와 같다.
+     */
+    public BigDecimal probability(SimulationInput used, List<SimulationInput.Event> extra, Long seed) {
+        List<SimulationInput.Event> events = new ArrayList<>(used.events());
+        events.addAll(extra);
+        SimulationInput with = new SimulationInput(used.startMonth(), used.person(), used.income(), used.expenses(),
+                used.assets(), used.savingPlan(), used.emergency(), used.loans(), used.goal(), events);
+        return Rounding.percent(analyzer.runMain(profileMapper.toPlan(with), (int) seedOf(seed)).hits(), Analyzer.PATHS);
     }
 
     public PreviewResponse preview(SimulationInput input, Adjustments adjustments, Long seed) {

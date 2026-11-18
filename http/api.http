@@ -150,3 +150,22 @@ Content-Type: application/json
 { "input": {{s1}}, "plans": [
   { "name": "변동지출 10만 원 줄이기", "adjustments": { "monthlyVariableExpense": 850000 } }
 ] }
+
+### 17. 계획 바꿔 보기 막대: 바꾼 계획으로 결과 전체 (그래프까지). 변동지출 10만 원 줄이면 70.5%
+POST {{host}}/api/simulate
+Content-Type: application/json
+
+{ "input": {{s1}}, "adjustments": { "monthlyVariableExpense": 850000 } }
+
+### 18. 미래 다시 보기 (데모): 상위 5% · 가운데 · 하위 5% 미래를 달마다
+POST {{host}}/api/simulate/story
+Content-Type: application/json
+
+{ "input": {{s1}} }
+
+### 19. 받을 수 있는 혜택: 판정 + 받으면 목표 달성 가능성이 얼마나 바뀌는지 (eligibility는 모두 선택, 비우면 '확인해 보세요')
+POST {{host}}/api/benefits
+Content-Type: application/json
+
+{ "input": {{s1}}, "eligibility": { "livingApart": true, "sme": true, "hireMonth": "2026-03", "militaryMonths": 0,
+  "parentsIncomeLow": true, "rentDeposit": 10000000, "monthlyTransit": 60000 } }
