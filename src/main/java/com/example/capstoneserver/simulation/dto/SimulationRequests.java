@@ -14,14 +14,17 @@ public final class SimulationRequests {
 
     private SimulationRequests() {}
 
+    /** adjustments(선택): 결과 화면 '계획 바꿔 보기'에서 바꾼 값. 있으면 바꾼 계획으로 계산한다 */
     public record Simulate(
             @NotNull(message = "입력을 보내 주세요") SimulationInput input,
+            Adjustments adjustments,
             Long seed
     ) {}
 
     /** 미래 다시 보기 (데모): 상위 5% · 가운데 · 하위 5% 미래를 달마다 */
     public record Story(
             @NotNull(message = "입력을 보내 주세요") SimulationInput input,
+            Adjustments adjustments,
             Long seed
     ) {}
 

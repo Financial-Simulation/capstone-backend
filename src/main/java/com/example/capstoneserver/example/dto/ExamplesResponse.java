@@ -1,6 +1,8 @@
 package com.example.capstoneserver.example.dto;
 
+import com.example.capstoneserver.benefit.dto.Eligibility;
 import com.example.capstoneserver.input.dto.SimulationInput;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
 
 /**
@@ -10,8 +12,10 @@ import java.util.List;
 public record ExamplesResponse(List<Example> examples) {
 
     public record Example(
-            String key,             // S1 ~ S3
+            String key,             // S1 ~ S4
             String label,           // 화면에 보이는 이름
-            SimulationInput input
+            SimulationInput input,
+            @JsonInclude(JsonInclude.Include.NON_NULL)
+            Eligibility eligibility // 혜택 질문 예시 답 (없으면 응답에서 빠짐). /api/benefits에 같이 보낸다
     ) {}
 }

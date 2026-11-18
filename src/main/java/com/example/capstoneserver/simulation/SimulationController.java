@@ -32,12 +32,12 @@ public class SimulationController {
 
     @PostMapping("/simulate")
     public ApiResponse<SimulateResponse> simulate(@Valid @RequestBody SimulationRequests.Simulate request) {
-        return ApiResponse.onSuccess(simulationService.simulate(request.input(), request.seed()));
+        return ApiResponse.onSuccess(simulationService.simulate(request.input(), request.adjustments(), request.seed()));
     }
 
     @PostMapping("/simulate/story")
     public ApiResponse<StoryResponse> story(@Valid @RequestBody SimulationRequests.Story request) {
-        return ApiResponse.onSuccess(simulationService.story(request.input(), request.seed()));
+        return ApiResponse.onSuccess(simulationService.story(request.input(), request.adjustments(), request.seed()));
     }
 
     @PostMapping("/simulate/preview")
