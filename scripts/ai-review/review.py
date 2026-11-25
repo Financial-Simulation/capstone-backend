@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PR 변경분을 Gemini에 보내 리뷰를 받고, 새 PR 댓글로 남긴다 (이전 리뷰 댓글은 지우지 않고 접어 둔다).
+"""PR 변경분을 OpenRouter에 보내 리뷰를 받고, 새 PR 댓글로 남긴다 (이전 리뷰 댓글은 지우지 않고 접어 둔다).
 
 - 참고용이다. API 오류·키 없음이어도 실패로 끝내지 않는다 (PR을 막지 않는다).
 - 정답 파일·바이너리·대용량 파일은 보내지 않는다. 정답 파일이 바뀌면 LLM 없이 직접 경고를 붙인다.
@@ -20,10 +20,9 @@ import urllib.error
 import urllib.request
 
 MARKER = "<!-- ai-review -->"
-MODEL = os.environ.get("GEMINI_MODEL") or "gemini-3.6-flash"
+MODEL = os.environ.get("AI_REVIEW_MODEL") or "nvidia/nemotron-3.5-lightning:free"
 MAX_DIFF_CHARS = int(os.environ.get("MAX_DIFF_CHARS", "120000"))
-THINKING_LEVEL = os.environ.get("GEMINI_THINKING_LEVEL", "low")  # 빈 값이면 모델 기본값
-TIMEOUT_S = int(os.environ.get("GEMINI_TIMEOUT_S", "300"))
+TIMEOUT_S = int(os.environ.get("AI_REVIEW_TIMEOUT_S", "300"))
 # diff만 보내면 바뀌지 않은 클래스의 동작을 추측해 오탐이 났다 (review/1111: NoiseSource를 상태 있는 객체로 가정).
 # 그래서 diff가 참조하는 저장소 클래스의 정의와 관련 테스트를 맥락으로 함께 보낸다.
 MAX_CONTEXT_CHARS = int(os.environ.get("MAX_CONTEXT_CHARS", "60000"))
@@ -33,7 +32,7 @@ MAX_CONTEXT_DEFS = int(os.environ.get("MAX_CONTEXT_DEFS", "8"))
 MAX_CONTEXT_TESTS = int(os.environ.get("MAX_CONTEXT_TESTS", "4"))
 CONTEXT_TEST_SHARE = 0.4  # 맥락 분량 중 테스트 몫
 TYPE_RE = re.compile(r"\b([A-Z][A-Za-z0-9_]*[a-z][A-Za-z0-9_]*)\b")
-API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # 리뷰에 보내지 않는 파일. 정답 파일은 기준 구현이 만든 숫자라 사람이 읽을 대상이 아니다
 EXCLUDE = [
@@ -200,40 +199,39 @@ def collect_context(diff, changed, head):
 
 def _post(api_key, body, timeout):
     req = urllib.request.Request(
-        API_URL.format(model=MODEL),
+        API_URL,
         data=json.dumps(body).encode(),
-        headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": os.environ.get("GITHUB_SERVER_URL", "https://github.com"),
+            "X-Title": "capstone-backend AI review",
+        },
         method="POST",
     )
     with urllib.request.urlopen(req, timeout=timeout) as res:
         return json.load(res)
 
 
-def call_gemini(api_key, user_text, system_prompt):
-    gen_config = {"maxOutputTokens": 8192}
-    # 리뷰에는 깊은 추론이 필요 없다. 기본값으로 두면 오래 생각하다 시간 초과가 났다 (PR #6)
-    if THINKING_LEVEL:
-        gen_config["thinkingConfig"] = {"thinkingLevel": THINKING_LEVEL}
+def call_openrouter(api_key, user_text, system_prompt):
     body = {
-        "systemInstruction": {"parts": [{"text": system_prompt}]},
-        "contents": [{"role": "user", "parts": [{"text": user_text}]}],
-        "generationConfig": gen_config,
+        "model": MODEL,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_text},
+        ],
+        "max_tokens": 8192,
     }
     data, last_err = None, None
     for attempt in range(3):
         started = time.time()
         try:
             data = _post(api_key, body, timeout=TIMEOUT_S)
-            print(f"Gemini 응답 {time.time() - started:.0f}초 (시도 {attempt + 1})")
+            print(f"OpenRouter 응답 {time.time() - started:.0f}초 (시도 {attempt + 1})")
             break
         except urllib.error.HTTPError as e:
             detail = e.read().decode(errors="replace")[:500]
             last_err = f"HTTP {e.code}: {detail}"
-            # 모델이 thinkingConfig를 거부하면 빼고 다시 보낸다
-            if e.code == 400 and "thinking" in detail.lower() and "thinkingConfig" in gen_config:
-                print(f"thinkingConfig 거부됨, 빼고 재시도: {detail[:200]}")
-                gen_config.pop("thinkingConfig")
-                continue
             if e.code in (429, 500, 502, 503, 504) and attempt < 2:
                 time.sleep(10 * (attempt + 1))
                 continue
@@ -249,15 +247,16 @@ def call_gemini(api_key, user_text, system_prompt):
     if data is None:
         raise RuntimeError(last_err or "응답 없음")
 
-    cands = data.get("candidates") or []
-    if not cands:
-        raise RuntimeError(f"응답에 후보가 없습니다: {json.dumps(data.get('promptFeedback', data))[:500]}")
-    parts = cands[0].get("content", {}).get("parts", [])
-    text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
-    finish = cands[0].get("finishReason", "")
+    choices = data.get("choices") or []
+    if not choices:
+        raise RuntimeError(f"응답에 선택지가 없습니다: {json.dumps(data.get('error', data))[:500]}")
+    text = choices[0].get("message", {}).get("content", "")
+    if not isinstance(text, str):
+        raise RuntimeError(f"텍스트 응답이 아닙니다: {type(text).__name__}")
+    finish = choices[0].get("finish_reason", "")
     if not text.strip():
-        raise RuntimeError(f"빈 응답 (finishReason={finish})")
-    if finish == "MAX_TOKENS":
+        raise RuntimeError(f"빈 응답 (finish_reason={finish})")
+    if finish == "length":
         text += "\n\n> 응답이 길이 제한에서 잘렸습니다."
     return text
 
@@ -343,13 +342,13 @@ def main():
         notice("리뷰할 코드 변경이 없어 건너뜁니다")
         return
 
-    api_key = os.environ.get("GEMINI_API_KEY")
+    api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
-        notice("GEMINI_API_KEY 시크릿이 없어 AI 리뷰를 건너뜁니다")
+        notice("OPENROUTER_API_KEY 시크릿이 없어 AI 리뷰를 건너뜁니다")
         return
 
     try:
-        review = call_gemini(api_key, user_text, system_prompt)
+        review = call_openrouter(api_key, user_text, system_prompt)
     except Exception as e:  # 참고용 리뷰라 실패해도 PR을 막지 않는다
         notice(f"AI 리뷰 실패 (PR에는 영향 없음): {e}")
         return
@@ -380,7 +379,7 @@ def main():
         review.strip(),
         "---",
         "<sub>참고용 자동 리뷰입니다. 틀릴 수 있으니 확인 후 반영하고, 머지 판단은 사람이 합니다. "
-        "변경분은 Google Gemini API(무료 등급)로 전송되며, 무료 등급 입력은 Google 제품 개선에 쓰일 수 있습니다. "
+        "변경분은 OpenRouter와 선택한 모델 제공자로 전송됩니다. 무료 모델의 데이터 처리 정책을 확인하세요. "
         f"시스템 설명: `{ctx_source}` · 설정: `scripts/ai-review/review.py`</sub>",
     ])
 

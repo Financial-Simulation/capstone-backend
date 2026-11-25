@@ -98,7 +98,7 @@
   - 롤백을 GitHub Actions에서 따로 실행: 서버 안에서 바로 되돌리는 쪽이 단계가 적고 네트워크 실패에 덜 민감 → 서버 스크립트에서
 
 ### AI 리뷰에 참조 클래스 정의와 관련 테스트를 맥락으로 넣는다 (2026-11-14)
-- 배경: PR마다 Gemini로 참고용 리뷰를 단다 (`.github/workflows/ai-review.yml`, `scripts/ai-review/review.py`). 머지를 막지 않고 판단은 사람이 한다.
+- 배경: PR마다 OpenRouter 무료 모델로 참고용 리뷰를 단다 (`.github/workflows/ai-review.yml`, `scripts/ai-review/review.py`). 머지를 막지 않고 판단은 사람이 한다.
 - 관찰: `review/1111`(c44b09a) 리뷰의 지적 2건이 모두 오탐이었다.
   - [높음] "NoiseSource를 공유해 난수 순서가 꼬인다": `noise(p, t)`는 호출마다 `Sfc32.of(seed, p, ...)`로 생성기를 새로 만든다. 상태가 없어 같은 인스턴스를 `simulate`와 `trace`에 넘겨도 같은 값이 나오고, `EngineTraceTest`가 이를 이미 고정한다.
   - [중간] "double 정렬이 불안정하다": `comparingDouble`은 `Double.compare`라 JVM에 따라 달라지지 않고, `.thenComparingInt(p -> p)`로 동점 기준도 있다.
@@ -108,4 +108,4 @@
 - 검토한 대안:
   - 저장소 전체를 보내기: 무료 등급 분량 한도와 응답 시간(PR #6에서 3분 시간 초과)에 걸림 → 기각
   - 임베딩·벡터 검색으로 관련 코드 찾기: 저장소가 작아 이름 기반 참조로 충분, 인프라만 늘어남 → 보류
-- 남은 일: 같은 PR을 다시 리뷰해 두 오탐이 사라지는지 실제 Gemini로 확인
+- 남은 일: 같은 PR을 다시 리뷰해 두 오탐이 사라지는지 실제 OpenRouter 모델로 확인
