@@ -25,7 +25,7 @@ DEFAULT_MODEL = "nvidia/nemotron-3.5-lightning:free"
 MAX_MODELS = 4
 MAX_DIFF_CHARS = int(os.environ.get("MAX_DIFF_CHARS", "120000"))
 TIMEOUT_S = int(os.environ.get("AI_REVIEW_TIMEOUT_S", "300"))
-MAX_TOKENS = int(os.environ.get("AI_REVIEW_MAX_TOKENS", "4096"))
+MAX_TOKENS = int(os.environ.get("AI_REVIEW_MAX_TOKENS", "8192"))
 MAX_REVIEW_CHARS = int(os.environ.get("AI_REVIEW_MAX_REVIEW_CHARS", "12000"))
 # diff만 보내면 바뀌지 않은 클래스의 동작을 추측해 오탐이 났다 (review/1111: NoiseSource를 상태 있는 객체로 가정).
 # 그래서 diff가 참조하는 저장소 클래스의 정의와 관련 테스트를 맥락으로 함께 보낸다.
