@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PR 변경분을 OpenRouter에 보내 리뷰를 받고, 새 PR 댓글로 남긴다 (이전 리뷰 댓글은 지우지 않고 접어 둔다).
+"""PR 변경분을 OpenRouter의 여러 모델에 병렬 리뷰시키고 비교 댓글을 남긴다.
 
 - 참고용이다. API 오류·키 없음이어도 실패로 끝내지 않는다 (PR을 막지 않는다).
 - 정답 파일·바이너리·대용량 파일은 보내지 않는다. 정답 파일이 바뀌면 LLM 없이 직접 경고를 붙인다.
@@ -14,15 +14,19 @@ import os
 import re
 import subprocess
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import sys
 import time
 import urllib.error
 import urllib.request
 
 MARKER = "<!-- ai-review -->"
-MODEL = os.environ.get("AI_REVIEW_MODEL") or "nvidia/nemotron-3.5-lightning:free"
+DEFAULT_MODEL = "nvidia/nemotron-3.5-lightning:free"
+MAX_MODELS = 4
 MAX_DIFF_CHARS = int(os.environ.get("MAX_DIFF_CHARS", "120000"))
 TIMEOUT_S = int(os.environ.get("AI_REVIEW_TIMEOUT_S", "300"))
+MAX_TOKENS = int(os.environ.get("AI_REVIEW_MAX_TOKENS", "4096"))
+MAX_REVIEW_CHARS = int(os.environ.get("AI_REVIEW_MAX_REVIEW_CHARS", "12000"))
 # diff만 보내면 바뀌지 않은 클래스의 동작을 추측해 오탐이 났다 (review/1111: NoiseSource를 상태 있는 객체로 가정).
 # 그래서 diff가 참조하는 저장소 클래스의 정의와 관련 테스트를 맥락으로 함께 보낸다.
 MAX_CONTEXT_CHARS = int(os.environ.get("MAX_CONTEXT_CHARS", "60000"))
@@ -213,21 +217,39 @@ def _post(api_key, body, timeout):
         return json.load(res)
 
 
-def call_openrouter(api_key, user_text, system_prompt):
+def configured_models():
+    """JSON 배열 또는 쉼표·줄바꿈 구분 목록을 읽고 중복과 빈 값을 제거한다."""
+    raw = os.environ.get("AI_REVIEW_MODELS", "").strip()
+    if raw:
+        try:
+            parsed = json.loads(raw) if raw.startswith("[") else re.split(r"[\n,]+", raw)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"AI_REVIEW_MODELS JSON 형식이 잘못되었습니다: {e.msg}") from e
+        if not isinstance(parsed, list) or not all(isinstance(item, str) for item in parsed):
+            raise ValueError("AI_REVIEW_MODELS는 모델 이름의 JSON 배열 또는 목록이어야 합니다")
+        models = list(dict.fromkeys(item.strip() for item in parsed if item.strip()))
+    else:
+        models = [os.environ.get("AI_REVIEW_MODEL") or DEFAULT_MODEL]
+    if not 1 <= len(models) <= MAX_MODELS:
+        raise ValueError(f"리뷰 모델은 1~{MAX_MODELS}개를 지정해야 합니다 (현재 {len(models)}개)")
+    return models
+
+
+def call_openrouter(api_key, model, user_text, system_prompt):
     body = {
-        "model": MODEL,
+        "model": model,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_text},
         ],
-        "max_tokens": 8192,
+        "max_tokens": MAX_TOKENS,
     }
     data, last_err = None, None
     for attempt in range(3):
         started = time.time()
         try:
             data = _post(api_key, body, timeout=TIMEOUT_S)
-            print(f"OpenRouter 응답 {time.time() - started:.0f}초 (시도 {attempt + 1})")
+            print(f"OpenRouter 응답 {model}: {time.time() - started:.1f}초 (시도 {attempt + 1})")
             break
         except urllib.error.HTTPError as e:
             detail = e.read().decode(errors="replace")[:500]
@@ -261,8 +283,35 @@ def call_openrouter(api_key, user_text, system_prompt):
     return text
 
 
+def call_models(api_key, models, user_text, system_prompt):
+    """모델 호출을 동시에 실행해 일부 실패와 무관하게 성공한 결과를 모은다."""
+    results = []
+    with ThreadPoolExecutor(max_workers=len(models), thread_name_prefix="openrouter") as executor:
+        futures = {}
+        for model in models:
+            started = time.monotonic()
+            future = executor.submit(call_openrouter, api_key, model, user_text, system_prompt)
+            futures[future] = (model, started)
+        for future in as_completed(futures):
+            model, started = futures[future]
+            elapsed = time.monotonic() - started
+            try:
+                results.append({"model": model, "review": future.result(), "elapsed": elapsed})
+            except Exception as e:
+                results.append({"model": model, "error": str(e), "elapsed": elapsed})
+    return [next(result for result in results if result["model"] == model) for model in models]
+
+
+def limit_review(text):
+    if len(text) <= MAX_REVIEW_CHARS:
+        return text
+    return text[:MAX_REVIEW_CHARS].rstrip() + (
+        f"\n\n> 리뷰 출력이 댓글 크기 제한을 위해 {len(text) - MAX_REVIEW_CHARS:,}자 잘렸습니다."
+    )
+
+
 OUTDATED_MARKER = "<!-- ai-review-outdated -->"
-HEADER_RE = re.compile(r"^## AI 코드 리뷰 .*$", re.M)
+HEADER_RE = re.compile(r"^## AI 코드 리뷰.*$", re.M)
 
 
 def fold_outdated(old_body):
@@ -348,9 +397,22 @@ def main():
         return
 
     try:
-        review = call_openrouter(api_key, user_text, system_prompt)
+        models = configured_models()
+    except ValueError as e:
+        notice(f"AI 리뷰 설정 오류 (PR에는 영향 없음): {e}")
+        return
+
+    try:
+        results = call_models(api_key, models, user_text, system_prompt)
     except Exception as e:  # 참고용 리뷰라 실패해도 PR을 막지 않는다
-        notice(f"AI 리뷰 실패 (PR에는 영향 없음): {e}")
+        notice(f"AI 리뷰 병렬 실행 실패 (PR에는 영향 없음): {e}")
+        return
+
+    succeeded = [result for result in results if "review" in result]
+    failed = [result for result in results if "error" in result]
+    for result in failed:
+        notice(f"AI 리뷰 실패 ({result['model']}, PR에는 영향 없음): {result['error']}")
+    if not succeeded:
         return
 
     extra = []
@@ -372,14 +434,37 @@ def main():
                      + "\n".join(lines) + "\n</details>")
 
     short = head[:7] if len(head) >= 7 else head
+    comparison_rows = []
+    for result in results:
+        if "review" in result:
+            status = f"완료 · {result['elapsed']:.1f}초"
+        else:
+            status = f"실패 · {result['elapsed']:.1f}초"
+        comparison_rows.append(f"| `{result['model']}` | {status} |")
+
+    reviews = []
+    first_success = next((i for i, result in enumerate(results) if "review" in result), -1)
+    for index, result in enumerate(results):
+        summary = f"`{result['model']}` · " + (
+            f"완료 ({result['elapsed']:.1f}초)" if "review" in result
+            else f"실패 ({result['elapsed']:.1f}초)"
+        )
+        opened = " open" if index == first_success else ""
+        content = (
+            limit_review(result["review"]) if "review" in result
+            else f"> OpenRouter 호출 실패: `{result['error']}`"
+        )
+        reviews.append(f"<details{opened}><summary>{summary}</summary>\n\n{content.strip()}\n\n</details>")
+
     body = "\n\n".join([
         MARKER,
-        f"## AI 코드 리뷰 (`{MODEL}`, 커밋 `{short}`)",
+        f"## AI 코드 리뷰 비교 ({len(results)}개 모델, 커밋 `{short}`)",
+        "| 모델 | 결과 |\n|---|---|\n" + "\n".join(comparison_rows),
         *extra,
-        review.strip(),
+        "\n\n".join(reviews),
         "---",
         "<sub>참고용 자동 리뷰입니다. 틀릴 수 있으니 확인 후 반영하고, 머지 판단은 사람이 합니다. "
-        "변경분은 OpenRouter와 선택한 모델 제공자로 전송됩니다. 무료 모델의 데이터 처리 정책을 확인하세요. "
+        "변경분은 OpenRouter와 선택한 모델 제공자들로 전송됩니다. 각 모델의 데이터 처리 정책과 과금 조건을 확인하세요. "
         f"시스템 설명: `{ctx_source}` · 설정: `scripts/ai-review/review.py`</sub>",
     ])
 
