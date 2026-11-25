@@ -1,9 +1,9 @@
 name: AI Review
 
-# PR 변경분을 Gemini(무료 등급)로 리뷰해 새 PR 댓글로 남긴다(이전 리뷰는 접어 둠). 참고용이며 PR을 막지 않는다.
+# PR 변경분을 OpenRouter의 무료 모델로 리뷰해 새 PR 댓글로 남긴다(이전 리뷰는 접어 둠). 참고용이며 PR을 막지 않는다.
 # 필요한 설정 (Settings → Secrets and variables → Actions)
-#   Secrets:   GEMINI_API_KEY  Google AI Studio에서 만든 키
-#   Variables: GEMINI_MODEL    (선택) 기본 gemini-3.6-flash
+#   Secrets:   OPENROUTER_API_KEY  OpenRouter에서 만든 키
+#   Variables: AI_REVIEW_MODEL     (선택) 기본 nvidia/nemotron-3.5-lightning:free
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -22,18 +22,17 @@ jobs:
     # 초안 PR과 포크에서 온 PR(시크릿을 못 읽음)은 건너뛴다
     if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 20   # Gemini 1회 최대 5분 × 재시도
+    timeout-minutes: 20   # 모델 1회 최대 5분 × 재시도
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - name: Review with Gemini
+      - name: Review with OpenRouter
         continue-on-error: true   # 리뷰가 실패해도 PR 체크는 초록불
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
-          GEMINI_THINKING_LEVEL: ${{ vars.GEMINI_THINKING_LEVEL || 'low' }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          AI_REVIEW_MODEL: ${{ vars.AI_REVIEW_MODEL }}
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
