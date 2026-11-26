@@ -582,8 +582,7 @@ public class SimulationEngine {
         for (Category category : categories) {
             cumulative += category.probM();
             if (occurrence < cumulative) {
-                double sampled = category.min() + (category.max() - category.min()) * amount;
-                return new ShockDraw(category.type(), category.label(), sampled);
+                return new ShockDraw(category.type(), category.label(), pick(amount, shock.amounts()));
             }
         }
         return null;

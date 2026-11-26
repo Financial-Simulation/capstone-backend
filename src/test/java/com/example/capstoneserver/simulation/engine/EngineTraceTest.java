@@ -76,12 +76,12 @@ class EngineTraceTest {
 
         assertThat(ceremony.shockType()).isEqualTo("CEREMONY");
         assertThat(ceremony.shockLabel()).isEqualTo("경조사비");
-        assertThat(ceremony.shock()).isBetween(50.0, 150.0);
+        assertThat(ceremony.shock()).isBetween(120.0, 300.0);
         assertThat(medical.shockType()).isEqualTo("MEDICAL");
-        assertThat(medical.shock()).isBetween(50.0, 350.0);
+        assertThat(medical.shock()).isBetween(120.0, 300.0);
         assertThat(accident.shockType()).isEqualTo("TRAFFIC_ACCIDENT");
         assertThat(accident.shockLabel()).isEqualTo("교통사고 자기부담금");
-        assertThat(accident.shock()).isBetween(250.0, 650.0);
+        assertThat(accident.shock()).isBetween(120.0, 300.0);
         assertThat(none.shock()).isZero();
         assertThat(none.shockType()).isNull();
     }

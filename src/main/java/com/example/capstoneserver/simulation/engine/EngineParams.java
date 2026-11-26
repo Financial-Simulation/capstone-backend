@@ -66,7 +66,7 @@ public record EngineParams(Stats stats, Policy policy, General general, Housing 
 
     /**
      * 급한 지출. categories가 없던 기존 설정은 amounts의 이산 분포를 사용한다.
-     * category별 확률은 월 확률이고 min·max는 만 원 단위이다.
+     * category별 확률은 월 확률이다. 금액 분포는 기존 시뮬레이션 결과를 유지한다.
      */
     public record Shock(@JsonProperty("prob_m") double probM, double[][] amounts, List<Category> categories) {
 
@@ -85,14 +85,12 @@ public record EngineParams(Stats stats, Policy policy, General general, Housing 
             double total = categories.stream().mapToDouble(Category::probM).sum();
             double scale = total > 0 ? probability / total : 0;
             List<Category> scaledCategories = categories.stream()
-                    .map(c -> new Category(c.type(), c.label(), c.probM() * scale,
-                            c.min() * amountScale, c.max() * amountScale))
+                    .map(c -> new Category(c.type(), c.label(), c.probM() * scale))
                     .toList();
             return new Shock(probability, scaledAmounts, scaledCategories);
         }
 
-        public record Category(String type, String label, @JsonProperty("prob_m") double probM,
-                               double min, double max) {}
+        public record Category(String type, String label, @JsonProperty("prob_m") double probM) {}
     }
 
     public record Rate(@JsonProperty("annual_rate") double annualRate) {}
