@@ -22,7 +22,7 @@ import urllib.request
 
 MARKER = "<!-- ai-review -->"
 DEFAULT_MODEL = "nvidia/nemotron-3.5-lightning:free"
-MAX_MODELS = 4
+MAX_MODELS = 5
 MAX_DIFF_CHARS = int(os.environ.get("MAX_DIFF_CHARS", "120000"))
 TIMEOUT_S = int(os.environ.get("AI_REVIEW_TIMEOUT_S", "300"))
 MAX_TOKENS = int(os.environ.get("AI_REVIEW_MAX_TOKENS", "8192"))

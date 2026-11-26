@@ -3,7 +3,7 @@ name: AI Review
 # PR 변경분을 OpenRouter의 여러 모델이 병렬로 리뷰해 비교 댓글 하나로 남긴다. 참고용이며 PR을 막지 않는다.
 # 필요한 설정 (Settings → Secrets and variables → Actions)
 #   Secrets:   OPENROUTER_API_KEY  OpenRouter에서 만든 키
-#   Variables: AI_REVIEW_MODELS    (선택) JSON 배열 또는 쉼표 구분 모델 목록, 최대 4개
+#   Variables: AI_REVIEW_MODELS    (선택) JSON 배열 또는 쉼표 구분 모델 목록, 최대 5개
 #              예: ["openai/gpt-4.1-mini","anthropic/claude-3.7-sonnet"]
 #              AI_REVIEW_MODEL도 기존 단일 모델 설정으로 계속 사용할 수 있다
 on:
