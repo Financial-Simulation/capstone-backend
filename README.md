@@ -18,7 +18,7 @@
 
 ---
 
-## ✨ 무엇을 하나
+## 💭 무엇을 하나
 
 | | |
 |---|---|
@@ -177,7 +177,7 @@ sequenceDiagram
 
 </details>
 
-## 📚 문서
+## 🗺️ 문서
 
 - [`docs/README.md`](docs/README.md) — 작업별 결정 기록(decision · context · checklist)
 - [`docs/architecture/api-overview.md`](docs/architecture/api-overview.md) — API 한눈에 보기
