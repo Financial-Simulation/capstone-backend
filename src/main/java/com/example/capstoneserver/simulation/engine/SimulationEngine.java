@@ -10,6 +10,7 @@ import com.example.capstoneserver.simulation.engine.EngineParams.Stats;
 import com.example.capstoneserver.simulation.engine.EngineResult.Allocation;
 import com.example.capstoneserver.simulation.engine.EngineResult.Flag;
 import com.example.capstoneserver.simulation.engine.EngineResult.TaxItem;
+import com.example.capstoneserver.simulation.engine.EngineParams.Shock.Category;
 import com.example.capstoneserver.simulation.engine.NoiseSource.PathNoise;
 import java.util.Comparator;
 import java.util.List;
@@ -327,8 +328,13 @@ public class SimulationEngine {
 
             // 6. 급전 (금액은 물가 반영)
             double shock = 0;
-            if (nz.uShock()[t] < st.shock().probM()) {
-                shock = pick(nz.uAmt()[t], st.shock().amounts()) * cum;
+            String shockType = null;
+            String shockLabel = null;
+            ShockDraw shockDraw = drawShock(st.shock(), nz.uShock()[t], nz.uAmt()[t]);
+            if (shockDraw != null) {
+                shock = shockDraw.amount() * cum;
+                shockType = shockDraw.type();
+                shockLabel = shockDraw.label();
                 lastShock = t;
             }
 
@@ -551,7 +557,7 @@ public class SimulationEngine {
                     double taxPaid = tax[itInterest][p] + tax[itClaw][p] + tax[itPension][p] - taxBefore;
                     rec.add(new PathTrace.Month(t, employed, benefit, ev, salary, income, living, shock, lump + depAdd, loanPay[t],
                             Double.isNaN(refund) ? 0 : refund, mNew, got, taxPaid, put1, putH, putP, putG, putI,
-                            cash, od, p1 + m1, housingValue, pensionValue, g, inv, dep, v, piPrev));
+                            cash, od, p1 + m1, housingValue, pensionValue, g, inv, dep, v, piPrev, shockType, shockLabel));
                 }
             }
         }
@@ -561,6 +567,27 @@ public class SimulationEngine {
     }
 
     // ===== 도우미 (명세서 5.4) =====
+
+    private record ShockDraw(String type, String label, double amount) {}
+
+    private static ShockDraw drawShock(EngineParams.Shock shock, double occurrence, double amount) {
+        List<Category> categories = shock.categories();
+        if (categories == null || categories.isEmpty()) {
+            return occurrence < shock.probM()
+                    ? new ShockDraw("SHOCK", "급한 지출", pick(amount, shock.amounts()))
+                    : null;
+        }
+
+        double cumulative = 0;
+        for (Category category : categories) {
+            cumulative += category.probM();
+            if (occurrence < cumulative) {
+                double sampled = category.min() + (category.max() - category.min()) * amount;
+                return new ShockDraw(category.type(), category.label(), sampled);
+            }
+        }
+        return null;
+    }
 
     /** 해지 시점 가입기간에 해당하는 약정이율 (1개월 이내 0, 1년 미만, 2년 미만, 2년 이상) */
     private static double housingRate(Housing hou, int held, boolean dream) {

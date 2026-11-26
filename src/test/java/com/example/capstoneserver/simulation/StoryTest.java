@@ -6,6 +6,7 @@ import com.example.capstoneserver.input.dto.SimulationInput;
 import com.example.capstoneserver.simulation.dto.StoryResponse;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -34,6 +35,24 @@ class StoryTest {
     @Test
     void T1_세금_상품이_있어도_그래프_값과_같다() throws IOException {
         check("T1");
+    }
+
+    @Test
+    void 급한_지출_사건에_유형과_금액이_함께_내려간다() throws IOException {
+        JsonNode c = goldenCase("S1");
+        StoryResponse story = service.story(mapper.treeToValue(c.get("input"), SimulationInput.class), null);
+
+        List<StoryResponse.Month> shocks = story.stories().stream()
+                .flatMap(s -> s.months().stream())
+                .filter(m -> m.shock() > 0)
+                .toList();
+
+        assertThat(shocks).isNotEmpty();
+        assertThat(shocks).allSatisfy(m -> {
+            assertThat(m.events()).contains("SHOCK");
+            assertThat(m.shockType()).isIn("CEREMONY", "MEDICAL", "TRAFFIC_ACCIDENT");
+            assertThat(m.shockLabel()).isNotBlank();
+        });
     }
 
     private void check(String key) throws IOException {

@@ -53,6 +53,39 @@ class EngineTraceTest {
         assertThat(bad).as("실직 중 재가입").isEmpty();
     }
 
+    @Test
+    void 급한_지출은_유형별_확률과_금액_범위로_뽑는다() {
+        EngineProfile profile = new EngineProfile(27, 2, EmploymentType.REGULAR, 250, 95, 95, 200, 0, 50, 0, null, 50,
+                List.of(), List.of());
+        NoiseSource categorized = (path, months) -> {
+            double occurrence = switch (path) {
+                case 0 -> 0.01;
+                case 1 -> 0.03;
+                case 2 -> 0.045;
+                default -> 0.06;
+            };
+            return new NoiseSource.PathNoise(new double[months], new double[months / 12 + 1],
+                    filled(months, 1), new double[months], filled(months, 1), filled(months, occurrence),
+                    filled(months, 0.5));
+        };
+
+        PathTrace.Month ceremony = engine.trace(profile, params, categorized, 0, 1, 0).months().getFirst();
+        PathTrace.Month medical = engine.trace(profile, params, categorized, 1, 1, 0).months().getFirst();
+        PathTrace.Month accident = engine.trace(profile, params, categorized, 2, 1, 0).months().getFirst();
+        PathTrace.Month none = engine.trace(profile, params, categorized, 3, 1, 0).months().getFirst();
+
+        assertThat(ceremony.shockType()).isEqualTo("CEREMONY");
+        assertThat(ceremony.shockLabel()).isEqualTo("경조사비");
+        assertThat(ceremony.shock()).isBetween(50.0, 150.0);
+        assertThat(medical.shockType()).isEqualTo("MEDICAL");
+        assertThat(medical.shock()).isBetween(50.0, 350.0);
+        assertThat(accident.shockType()).isEqualTo("TRAFFIC_ACCIDENT");
+        assertThat(accident.shockLabel()).isEqualTo("교통사고 자기부담금");
+        assertThat(accident.shock()).isBetween(250.0, 650.0);
+        assertThat(none.shock()).isZero();
+        assertThat(none.shockType()).isNull();
+    }
+
     private void assertSameAsSimulate(EngineProfile profile) {
         EngineResult result = engine.simulate(profile, params, noise, PATHS, MONTHS, 0, true);
         List<String> bad = new ArrayList<>();
@@ -66,5 +99,11 @@ class EngineTraceTest {
             }
         }
         assertThat(bad).as("simulate와 다른 달").isEmpty();
+    }
+
+    private static double[] filled(int length, double value) {
+        double[] values = new double[length];
+        java.util.Arrays.fill(values, value);
+        return values;
     }
 }
