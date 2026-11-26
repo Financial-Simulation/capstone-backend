@@ -136,8 +136,38 @@ PR 변경분을 OpenRouter로 보내 최대 4개 모델이 동시에 리뷰한�
 
 </details>
 
+## ☁️ 배포 — AWS
+
+**main에 머지하면 자동으로 EC2에 배포된다.**
+
+```mermaid
+sequenceDiagram
+    participant GH as GitHub Actions
+    participant ECR as Amazon ECR
+    participant SSM as Systems Manager
+    participant EC2 as EC2 (Docker)
+    GH->>GH: CI 통과 (테스트 · 이미지 빌드 · 헬스체크)
+    GH->>ECR: 이미지 푸시 (태그 = 커밋 SHA, 덮어쓰기 금지)
+    GH->>SSM: 배포 스크립트 전송
+    SSM->>EC2: 새 이미지 pull → 컨테이너 교체
+    EC2-->>EC2: /actuator/health 실패 시 이전 이미지로 자동 롤백
+    GH->>EC2: 외부 헬스체크 → 실행 요약에 배포 기록
+```
+
+| 구성 | 내용 |
+|---|---|
+| 서버 | EC2 `t3.small` (Amazon Linux 2023), 탄력적 IP, 80 → 8080 |
+| 이미지 | ECR 비공개 저장소, 태그 변경 불가 + 푸시 시 스캔 |
+| 접속 | SSH 포트 닫음. 명령은 **SSM**으로만 보낸다 |
+| 권한 | 배포 전용 IAM 사용자, 권한은 [`infra/aws/`](infra/aws) 정책 범위로 제한 |
+| 롤백 | 헬스체크 실패 시 자동. 수동 실행(`workflow_dispatch`)으로 예전 커밋 재배포 |
+| 모니터링 | k6로 매일 응답 시간 측정 → 디스코드 |
+
+- 배포 스크립트: [`scripts/deploy/ec2-deploy.sh`](scripts/deploy/ec2-deploy.sh)
+- 처음 설정 순서: [`setup-aws.md`](docs/tasks/infra-queue-k6-aws-cicd/setup-aws.md)
+
 <details>
-<summary><b>☁️ Render 배포</b></summary>
+<summary><b>🎨 Render 배포 (대안)</b></summary>
 
 <br>
 
