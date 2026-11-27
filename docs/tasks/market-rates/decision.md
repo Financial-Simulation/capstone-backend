@@ -73,9 +73,12 @@
 
 1. ECOS Open API(https://ecos.bok.or.kr/api)에서 인증키를 신청한다. 키를 받기 전에 시험만 할 때는 ECOS 예시 키 `sample`을 넣어도 받아진다 (요청이 10줄 이하라서).
 2. 로컬: `ECOS_API_KEY=발급받은키 ./gradlew bootRun`. 로그에 `금리 갱신: 6/6개 받음 …`이 찍히면 된다.
-3. 배포 서버(EC2): `scripts/deploy/ec2-deploy.sh`의 `docker run`에 키를 넘겨야 한다. 키를 서버 어디에 둘지 정하지 않아서 아직 넣지 않았다.
+3. 배포 서버(EC2): GitHub `production` 환경 Secret에 `ECOS_API_KEY`를 넣는다. Deploy 워크플로가 SSM으로 보내는 배포 스크립트에 키를 붙이고, `ec2-deploy.sh`가 컨테이너에 넘긴다.
+   - Secret을 넣거나 바꾼 뒤의 배포부터 켜진다. 같은 커밋을 다시 배포해도(수동 실행) 키가 바뀌었으면 컨테이너를 새로 만든다.
+   - 키 값은 SSM 명령 기록(AWS 콘솔)에도 남는다. 팀 AWS 계정 안에서만 보이고, 공개 통계를 읽는 무료 키라 이렇게 둔다.
+   - Secret이 없으면 Deploy 실행에 경고만 뜨고 지금처럼(params.json 값) 배포된다.
 
 ## 남은 일
 
-- 배포 서버에 키 넣기 (위 3번).
-- 프론트 `src/config/policy.ts`의 대출 기본 금리·일반 적금 3.03%를 `/api/meta`의 `defaultRates`로 바꾸기. 지금 프론트는 이 값을 안내 문장·placeholder에만 써서 계산에는 영향이 없다.
+- 저장소 관리자가 `production` 환경 Secret에 `ECOS_API_KEY` 넣기 (위 3번).
+- 프론트: capstone-frontend `feat/default-rates`에서 `/api/meta`의 `defaultRates`를 쓰게 바꿨다 (리뷰 대기). 그 전 프론트는 대출 종류를 고르면 코드의 기본 금리를 칸에 넣어 보내서 서버 기본값이 쓰이지 않았다.

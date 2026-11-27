@@ -1,8 +1,12 @@
 #!/bin/bash
 # EC2 안에서 실행된다. GitHub Actions가 SSM으로 이 파일 내용을 보내고, 앞에 아래 변수를 붙인다.
 #   REGION, REGISTRY(예: 123456789012.dkr.ecr.ap-southeast-2.amazonaws.com), IMAGE(레지스트리/저장소:태그)
+#   ECOS_API_KEY(production Secret. 비어 있으면 금리 자동 갱신 없이 돈다)
 # 하는 일: 새 이미지 받기 → 지금 컨테이너를 기록해 두고 교체 → 헬스체크 → 실패하면 이전 이미지로 되돌림
 set -euo pipefail
+
+# 컨테이너에는 `-e ECOS_API_KEY`(이름만)로 넘긴다. 값이 docker 명령줄·로그에 남지 않게
+export ECOS_API_KEY="${ECOS_API_KEY:-}"
 
 NAME=app
 STATE_DIR=/opt/capstone
@@ -14,7 +18,12 @@ log() { echo "[$(date -u +%H:%M:%S)] $*"; }
 run_container() {
   # 메모리 2GB 서버에서 OS·Docker 몫을 남기고 1.5GB까지. JVM은 그 75%를 힙으로 쓴다(Dockerfile)
   docker run -d --name "$NAME" --restart unless-stopped \
-    --memory 1500m -p 80:8080 -e PORT=8080 "$1" > /dev/null
+    --memory 1500m -p 80:8080 -e PORT=8080 -e ECOS_API_KEY "$1" > /dev/null
+}
+
+# 지금 컨테이너에 들어 있는 ECOS 키. 비교에만 쓰고 출력하지 않는다
+running_ecos_key() {
+  docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$NAME" 2>/dev/null | sed -n 's/^ECOS_API_KEY=//p' || true
 }
 
 wait_healthy() {
@@ -38,8 +47,13 @@ PREV=$(docker inspect --format '{{.Config.Image}}' "$NAME" 2>/dev/null || true)
 log "현재 이미지: ${PREV:-없음(첫 배포)}"
 
 if [ "$PREV" = "$IMAGE" ]; then
-  log "이미 같은 이미지가 돌고 있어 교체하지 않습니다"
-  wait_healthy && exit 0
+  # Secret에 키를 넣거나 바꾼 뒤 같은 커밋을 다시 배포하면 컨테이너를 새로 만들어야 키가 들어간다
+  if [ "$(running_ecos_key)" = "$ECOS_API_KEY" ]; then
+    log "이미 같은 이미지가 같은 설정으로 돌고 있어 교체하지 않습니다"
+    wait_healthy && exit 0
+  else
+    log "같은 이미지지만 ECOS 키가 바뀌어 컨테이너를 다시 만듭니다"
+  fi
 fi
 
 docker rm -f "$NAME" > /dev/null 2>&1 || true

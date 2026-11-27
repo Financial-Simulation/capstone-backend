@@ -11,6 +11,7 @@ name: Deploy
 #   Environment secrets
 #     AWS_ACCESS_KEY_ID      github-actions-deploy 사용자의 액세스 키 ID
 #     AWS_SECRET_ACCESS_KEY  위 키의 비밀 액세스 키
+#     ECOS_API_KEY           (선택) 한국은행 ECOS 인증키. 없으면 금리 자동 갱신 없이 배포한다
 #   Environment variables
 #     AWS_REGION       예) ap-southeast-2
 #     ECR_REPOSITORY   예) capstone-backend
@@ -108,9 +109,11 @@ jobs:
         env:
           IMAGE: ${{ steps.image.outputs.image }}
           REGISTRY: ${{ steps.ecr.outputs.registry }}
+          ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
         run: |
-          # 변수 세 줄 + 배포 스크립트를 한 덩어리로 보낸다
-          { printf 'REGION=%q\nREGISTRY=%q\nIMAGE=%q\n' "$AWS_REGION" "$REGISTRY" "$IMAGE"; cat scripts/deploy/ec2-deploy.sh; } > /tmp/deploy.sh
+          [ -n "$ECOS_API_KEY" ] || echo "::warning::ECOS_API_KEY Secret이 없어 금리 자동 갱신 없이 배포합니다"
+          # 변수 네 줄 + 배포 스크립트를 한 덩어리로 보낸다 (ECOS 키 값은 SSM 명령 기록에도 남는다)
+          { printf 'REGION=%q\nREGISTRY=%q\nIMAGE=%q\nECOS_API_KEY=%q\n' "$AWS_REGION" "$REGISTRY" "$IMAGE" "$ECOS_API_KEY"; cat scripts/deploy/ec2-deploy.sh; } > /tmp/deploy.sh
           jq -n --rawfile s /tmp/deploy.sh '{commands: [$s], executionTimeout: ["600"]}' > /tmp/params.json
 
           CMD_ID=$(aws ssm send-command \

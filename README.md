@@ -56,7 +56,7 @@ docker run -p 8080:8080 capstone-backend
 |---|---|---|
 | `PORT` | `8080` | 서버 포트. JVM 메모리는 컨테이너 메모리의 75%까지 쓴다 |
 | `APP_CORS_ALLOWEDORIGINS` | `application.properties`의 `app.cors.allowed-origins` | 프론트 주소 (쉼표로 여러 개) |
-| `ECOS_API_KEY` | 없음 | 한국은행 ECOS Open API 키. 있으면 통장·일반 적금·마이너스·대출 기본 금리를 매일 최신 값으로 바꾼다 ([market-rates](docs/tasks/market-rates/decision.md)). 없으면 params.json·코드 기본값 그대로 |
+| `ECOS_API_KEY` | 없음 | 한국은행 ECOS Open API 키. 있으면 통장·일반 적금·마이너스·대출 기본 금리를 매일 최신 값으로 바꾼다 ([market-rates](docs/tasks/market-rates/decision.md)). 없으면 params.json·코드 기본값 그대로. 배포 서버는 GitHub `production` 환경 Secret에서 받는다 |
 
 ## 📡 API
 
