@@ -1,6 +1,7 @@
 package com.example.capstoneserver.simulation;
 
 import com.example.capstoneserver.global.response.ApiResponse;
+import com.example.capstoneserver.market.RateDefaults;
 import com.example.capstoneserver.simulation.dto.CompareResponse;
 import com.example.capstoneserver.simulation.dto.MetaResponse;
 import com.example.capstoneserver.simulation.dto.PreviewResponse;
@@ -76,6 +77,6 @@ public class SimulationController {
         JsonNode meta = paramsRepository.getMeta();
         return ApiResponse.onSuccess(new MetaResponse(paramsRepository.getModelVersion(), Analyzer.PATHS, 20261007,
                 Analyzer.HORIZON, meta.get("gradeLegend"), meta.get("editableInputs"), meta.get("parameters"),
-                meta.get("otherGrades"), meta.get("validation")));
+                meta.get("otherGrades"), meta.get("validation"), RateDefaults.forMeta()));
     }
 }

@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * 대출 종류. 금리·상환 방식을 비워 두면 여기 기본값을 쓴다 (명세서 '대출 종류별 기본값' 표).
+ * 금리는 RateDefaults.loan()으로 읽는다: 주택담보·신용·전세자금은 한국은행 최신 값을 받았으면 그 값이 먼저다.
  */
 @Getter
 @RequiredArgsConstructor

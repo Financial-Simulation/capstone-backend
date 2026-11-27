@@ -18,6 +18,7 @@
 | [engine-port](tasks/engine-port/decision.md) | 구현·정답 대조 완료 (2026-11-02) | 계산 엔진 Java 이식, `/simulate`·`/compare`·`/reverse`·`/robust`·`/meta` |
 | [tax-module-v1.7](tasks/tax-module-v1.7/decision.md) | 구현·정답 대조 완료 (2026-11-02), 리뷰 대기 | 세금 모듈(연말정산·청약·연금저축·4대보험), `/allocations/recommend`, `/reports` |
 | [presentation-demo](tasks/presentation-demo/plan.md) | 확정 (2026-10-29) | 피드백에 답하는 발표 PPT 12장(약 8분)과 대본, 데모 수준 B(입력 라이브 + 미리 계산한 결과) |
+| [market-rates](tasks/market-rates/decision.md) | 구현 (2026-11-27), 리뷰 대기 | 한국은행 ECOS로 통장·적금·마이너스·대출 기본 금리를 매일 갱신 (`ECOS_API_KEY`가 있을 때만) |
 
 ## 원본 문서
 

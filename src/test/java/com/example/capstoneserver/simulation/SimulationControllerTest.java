@@ -161,7 +161,10 @@ class SimulationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.modelVersion").value("1.7"))
                 .andExpect(jsonPath("$.result.defaultSeed").value(20261007))
-                .andExpect(jsonPath("$.result.parameters[0].grade").exists());
+                .andExpect(jsonPath("$.result.parameters[0].grade").exists())
+                // ECOS 키가 없는 테스트에서는 코드 기본값
+                .andExpect(jsonPath("$.result.defaultRates.generalSavingRate").value(3.03))
+                .andExpect(jsonPath("$.result.defaultRates.loanRates.JEONSE").value(4.3));
     }
 
     private String simulate(String body) throws Exception {
