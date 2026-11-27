@@ -100,6 +100,7 @@ x86 인스턴스는 ARM 유형(t4g)으로 바꿀 수 없다 (OS가 다름).
 |---|---|
 | `AWS_ACCESS_KEY_ID` | 5-3의 `AccessKeyId` |
 | `AWS_SECRET_ACCESS_KEY` | 5-3의 `SecretAccessKey` |
+| `ECOS_API_KEY` | (선택) 한국은행 ECOS 인증키 ([market-rates](../market-rates/decision.md)). 없으면 금리 자동 갱신 없이 배포된다 |
 
 **Environment variables** (Secret이 아니라 Variable에 넣는다. 워크플로가 `vars.*`로 읽는다)
 

@@ -32,4 +32,6 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // 테스트는 늘 params.json·코드 기본값으로 계산한다 (셸에 ECOS_API_KEY가 있어도 금리를 받지 않음, 정답 대조가 흔들리지 않게)
+    systemProperty 'app.market.ecos-api-key', ''
 }

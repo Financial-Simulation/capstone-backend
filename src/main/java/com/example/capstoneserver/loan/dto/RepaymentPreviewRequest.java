@@ -2,6 +2,7 @@ package com.example.capstoneserver.loan.dto;
 
 import com.example.capstoneserver.input.dto.LoanType;
 import com.example.capstoneserver.input.dto.RepaymentType;
+import com.example.capstoneserver.market.RateDefaults;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
@@ -32,9 +33,9 @@ public record RepaymentPreviewRequest(
 
         RepaymentType repaymentType
 ) {
-    /** 비워 두면 대출 종류별 기본 금리 */
+    /** 비워 두면 대출 종류별 기본 금리 (한국은행 최신 값을 받았으면 그 값, RateDefaults) */
     public BigDecimal resolvedRate() {
-        return annualRate != null ? annualRate : loanType.getDefaultRate();
+        return annualRate != null ? annualRate : RateDefaults.loan(loanType);
     }
 
     /** 비워 두면 대출 종류별 기본 상환 방식 */

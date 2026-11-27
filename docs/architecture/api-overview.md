@@ -26,7 +26,7 @@
 | GET | `/api/robust/{jobId}` | 동기 | — | 진행률·결과 (10분 보관) |
 | POST | `/api/allocations/recommend` | 동기 | — | 자산 쪼개기: 청년미래·청약·연금저축 배분 추천 (v1.7) |
 | POST | `/api/reports` | 동기 | — | 리포트 데이터 (simulate·reverse·compare 묶음, v1.7에서 구현) |
-| GET | `/api/meta` | 동기 | 즉시 | 파라미터 20개 + 근거 등급·출처 (FR-10) |
+| GET | `/api/meta` | 동기 | 즉시 | 파라미터 20개 + 근거 등급·출처 (FR-10), 비운 칸 기본 금리(`defaultRates`) |
 | GET | `/api/events/presets` | 동기 | 즉시 | 예정된 일 프리셋 5종 |
 | GET | `/api/examples` | 동기 | 즉시 | S1~S4 예시 입력, S4는 혜택 질문 답 포함 (프론트 상수로 대체 가능) |
 

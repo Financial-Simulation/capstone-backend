@@ -34,6 +34,7 @@ Controller (@Valid @RequestBody 요청 record)
 - 단, 값은 `t`(기간)에 따라 달라진다 (정규난수를 `t`개 뽑은 뒤 연 단위 난수를 이어서 뽑기 때문). **같은 경로를 비교하는 두 호출은 같은 `t`를 넘겨야 한다.** 확인할 점은 이것이다.
 - `NoiseSource.zero()`는 확정 계산(난수 0)용이다.
 - 같은 입력 + 같은 seed = 같은 결과 (NFR-02). seed 기본값 `20261007`. 계획 비교·미리보기는 **같은 seed로 함께** 계산한다 (공통 난수).
+- 단, ECOS 키가 있으면 금리가 한국은행 최신 값으로 바뀌므로(아래 「시장 금리」) **같은 금리 기준 달 안에서만** 같다. 기준 달은 `GET /api/meta`에 있다.
 - `Sfc32`는 engine.js와 비트 단위로 같다. 생성 순서·버리는 개수(12개)·`mix` 식을 바꾸면 모든 확률이 바뀐다.
 
 ## 계산 엔진
@@ -41,7 +42,7 @@ Controller (@Valid @RequestBody 요청 record)
 - `SimulationEngine.simulate`: 경로 `IntStream.range(0, n).parallel()`. 경로끼리 상태를 공유하지 않는다. 결과 배열은 경로 번호로 칸이 나뉘어 있다.
 - 경로 수 2,000, 기간 120개월은 보고서 기준이라 바꾸지 않는다 (`Analyzer.PATHS`, `HORIZON`).
 - 기준 구현은 Python `kernel.py` / JS `engine.js` (`finance-simulator-reference` 저장소). Java는 이식본이다.
-- 파라미터는 `resources/params.json`을 서버 시작 때 한 번 읽는다 (`ParamsRepository`, 읽기 전용).
+- 파라미터는 `resources/params.json`을 서버 시작 때 한 번 읽는다 (`ParamsRepository`, 파일은 읽기 전용). 계산에 쓰는 값(`getEngineParams()`)은 시장 금리 3개만 덮어쓸 수 있고, params.json 값은 `getBaseEngineParams()`에 그대로 있다.
 
 ## 정답 대조 테스트
 
@@ -62,9 +63,17 @@ Controller (@Valid @RequestBody 요청 record)
 
 - `RobustJobService`: 스레드 2개 고정 풀, 동시 실행 2개 상한(넘으면 `JOB4001`), 결과는 메모리 `ConcurrentHashMap`에 완료 후 10분 보관. 서버 재시작 시 사라지는 게 의도다.
 
+## 시장 금리 (`market/`, ECOS 키가 있을 때만)
+
+- `MarketRateService`가 한국은행 ECOS에서 금리 6개를 서버가 켜지고 3초 뒤 한 번, 그 뒤 매일 07:00에 받는다. 요청마다 부르지 않는다.
+- 통장·일반 적금·마이너스는 `ParamsRepository.applyMarketRates()`로 계산에 쓰는 값에만 덮어쓴다. 테스트는 키 없이 돌아(아래) 정답 대조는 params.json 값 그대로다.
+- 사용자가 비운 금리 칸(일반 적금, 주택담보·신용·전세자금 대출)은 `RateDefaults`(정적 `volatile`)에서 읽는다. 입력 record가 bean이 아니어서 **일부러 정적이다.**
+- 키(`app.market.ecos-api-key`, 환경변수 `ECOS_API_KEY`)가 없으면 아무것도 하지 않는다. 테스트는 `build.gradle`에서 키를 비운다.
+- 받은 값은 메모리에만 둔다. 실패한 항목은 마지막 값을 그대로 쓴다.
+
 ## 저장·로그
 
-- DB·파일 쓰기·캐시가 없다. 입력은 요청이 끝나면 사라진다 (NFR-06).
+- DB·파일 쓰기·캐시가 없다. 입력은 요청이 끝나면 사라진다 (NFR-06). 시장 금리도 메모리에만 둔다.
 - 요청 본문(금융 입력값)을 로그에 남기지 않는다. 새 `log.*` 호출에 입력값이 들어가면 문제다.
 
 ## 응답 시간 목표 (NFR-03)
