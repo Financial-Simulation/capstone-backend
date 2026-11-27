@@ -26,12 +26,24 @@ public record StoryResponse(long seed, int paths, String startMonth, int goalMon
      * @param month       그 일이 일어난 달 (YYYY-MM, 시작 달 + afterMonths − 1)
      * @param events      JOB_LOSS · REHIRE · SHOCK · PLANNED · REFUND · BREAK_GENERAL · BREAK_HOUSING · BREAK_POLICY ·
      *                    BREAK_POLICY_SPECIAL · BREAK_PENSION · MATURE_POLICY · REJOIN_POLICY · OVERDRAFT(빌리기 시작) · DEBT_CLEARED(다 갚음) · GOAL_REACHED
+     * @param shockType   급한 지출 유형 코드 (CEREMONY · MEDICAL · TRAFFIC_ACCIDENT), 사건이 없으면 null
+     * @param shockLabel  급한 지출 유형 이름, 사건이 없으면 null
      * @param inflation   그해 물가 상승률 (%, 소수 2자리)
      */
     public record Month(int afterMonths, String month, boolean employed, boolean unemploymentBenefit, List<String> events,
                         long salary, long income, long living, long shock, long planned, long loan,
                         long refund, long subsidy, long received, long taxPaid,
-                        Deposits deposits, Balances balances, long total, BigDecimal inflation) {}
+                        Deposits deposits, Balances balances, long total, BigDecimal inflation,
+                        String shockType, String shockLabel) {
+
+        public Month(int afterMonths, String month, boolean employed, boolean unemploymentBenefit, List<String> events,
+                     long salary, long income, long living, long shock, long planned, long loan,
+                     long refund, long subsidy, long received, long taxPaid,
+                     Deposits deposits, Balances balances, long total, BigDecimal inflation) {
+            this(afterMonths, month, employed, unemploymentBenefit, events, salary, income, living, shock, planned, loan,
+                    refund, subsidy, received, taxPaid, deposits, balances, total, inflation, null, null);
+        }
+    }
 
     /** 그달 넣은 돈 */
     public record Deposits(long policy, long housing, long pension, long general, long invest) {}

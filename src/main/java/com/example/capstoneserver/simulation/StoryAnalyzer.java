@@ -93,7 +93,7 @@ class StoryAnalyzer {
                             won(m.putInvest())),
                     new StoryResponse.Balances(won(m.cash()), won(m.overdraft()), won(m.policy()), won(m.housing()),
                             won(m.pension()), won(m.general()), won(m.invest()), won(m.deposit())),
-                    won(m.total()), decimal(m.inflation() * 100, 2)));
+                    won(m.total()), decimal(m.inflation() * 100, 2), m.shockType(), m.shockLabel()));
         }
         return months;
     }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PR 변경분을 OpenRouter의 여러 모델에 병렬 리뷰시키고 비교 댓글을 남긴다.
+"""PR 변경분을 OpenRouter 모델과 Google Gemini에 병렬 리뷰시키고 비교 댓글을 남긴다.
 
 - 참고용이다. API 오류·키 없음이어도 실패로 끝내지 않는다 (PR을 막지 않는다).
 - 정답 파일·바이너리·대용량 파일은 보내지 않는다. 정답 파일이 바뀌면 LLM 없이 직접 경고를 붙인다.
@@ -23,6 +23,8 @@ import urllib.request
 MARKER = "<!-- ai-review -->"
 DEFAULT_MODEL = "nvidia/nemotron-3.5-lightning:free"
 MAX_MODELS = 4
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL") or "gemini-3.6-flash"
+GEMINI_THINKING_LEVEL = os.environ.get("GEMINI_THINKING_LEVEL", "low")
 MAX_DIFF_CHARS = int(os.environ.get("MAX_DIFF_CHARS", "120000"))
 TIMEOUT_S = int(os.environ.get("AI_REVIEW_TIMEOUT_S", "300"))
 MAX_TOKENS = int(os.environ.get("AI_REVIEW_MAX_TOKENS", "8192"))
@@ -37,6 +39,7 @@ MAX_CONTEXT_TESTS = int(os.environ.get("MAX_CONTEXT_TESTS", "4"))
 CONTEXT_TEST_SHARE = 0.4  # 맥락 분량 중 테스트 몫
 TYPE_RE = re.compile(r"\b([A-Z][A-Za-z0-9_]*[a-z][A-Za-z0-9_]*)\b")
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 # 리뷰에 보내지 않는 파일. 정답 파일은 기준 구현이 만든 숫자라 사람이 읽을 대상이 아니다
 EXCLUDE = [
@@ -283,15 +286,84 @@ def call_openrouter(api_key, model, user_text, system_prompt):
     return text
 
 
-def call_models(api_key, models, user_text, system_prompt):
-    """모델 호출을 동시에 실행해 일부 실패와 무관하게 성공한 결과를 모은다."""
+def _post_gemini(api_key, body, timeout):
+    req = urllib.request.Request(
+        GEMINI_API_URL.format(model=GEMINI_MODEL),
+        data=json.dumps(body).encode(),
+        headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as res:
+        return json.load(res)
+
+
+def call_gemini(api_key, user_text, system_prompt):
+    gen_config = {"maxOutputTokens": MAX_TOKENS}
+    if GEMINI_THINKING_LEVEL:
+        gen_config["thinkingConfig"] = {"thinkingLevel": GEMINI_THINKING_LEVEL}
+    body = {
+        "systemInstruction": {"parts": [{"text": system_prompt}]},
+        "contents": [{"role": "user", "parts": [{"text": user_text}]}],
+        "generationConfig": gen_config,
+    }
+    data, last_err = None, None
+    for attempt in range(3):
+        started = time.time()
+        try:
+            data = _post_gemini(api_key, body, timeout=TIMEOUT_S)
+            print(f"Gemini API 응답 {GEMINI_MODEL}: {time.time() - started:.1f}초 (시도 {attempt + 1})")
+            break
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode(errors="replace")[:500]
+            last_err = f"HTTP {e.code}: {detail}"
+            if e.code == 400 and "thinking" in detail.lower() and "thinkingConfig" in gen_config:
+                print(f"thinkingConfig 거부됨, 빼고 재시도: {detail[:200]}")
+                gen_config.pop("thinkingConfig")
+                continue
+            if e.code in (429, 500, 502, 503, 504) and attempt < 2:
+                time.sleep(10 * (attempt + 1))
+                continue
+            raise RuntimeError(last_err)
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            last_err = f"{type(e).__name__}: {e} ({time.time() - started:.0f}초)"
+            print(f"재시도 {attempt + 1}: {last_err}")
+            if attempt < 2:
+                time.sleep(5)
+                continue
+            raise RuntimeError(last_err)
+    if data is None:
+        raise RuntimeError(last_err or "응답 없음")
+
+    candidates = data.get("candidates") or []
+    if not candidates:
+        raise RuntimeError(f"응답에 후보가 없습니다: {json.dumps(data.get('promptFeedback', data))[:500]}")
+    parts = candidates[0].get("content", {}).get("parts", [])
+    text = "".join(part.get("text", "") for part in parts if not part.get("thought"))
+    finish = candidates[0].get("finishReason", "")
+    if not text.strip():
+        raise RuntimeError(f"빈 응답 (finishReason={finish})")
+    if finish == "MAX_TOKENS":
+        text += "\n\n> 응답이 길이 제한에서 잘렸습니다."
+    return text
+
+
+def call_models(openrouter_key, gemini_key, models, user_text, system_prompt):
+    """OpenRouter와 Gemini API를 동시에 호출해 일부 실패와 무관하게 결과를 모은다."""
     results = []
-    with ThreadPoolExecutor(max_workers=len(models), thread_name_prefix="openrouter") as executor:
+    jobs = []
+    if openrouter_key:
+        jobs.extend(
+            (model, lambda model=model: call_openrouter(openrouter_key, model, user_text, system_prompt))
+            for model in models
+        )
+    if gemini_key:
+        jobs.append((f"Google Gemini API ({GEMINI_MODEL})",
+                     lambda: call_gemini(gemini_key, user_text, system_prompt)))
+    with ThreadPoolExecutor(max_workers=len(jobs), thread_name_prefix="ai-review") as executor:
         futures = {}
-        for model in models:
-            started = time.monotonic()
-            future = executor.submit(call_openrouter, api_key, model, user_text, system_prompt)
-            futures[future] = (model, started)
+        for model, call in jobs:
+            future = executor.submit(call)
+            futures[future] = (model, time.monotonic())
         for future in as_completed(futures):
             model, started = futures[future]
             elapsed = time.monotonic() - started
@@ -299,7 +371,7 @@ def call_models(api_key, models, user_text, system_prompt):
                 results.append({"model": model, "review": future.result(), "elapsed": elapsed})
             except Exception as e:
                 results.append({"model": model, "error": str(e), "elapsed": elapsed})
-    return [next(result for result in results if result["model"] == model) for model in models]
+    return [next(result for result in results if result["model"] == model) for model, _ in jobs]
 
 
 def limit_review(text):
@@ -391,9 +463,10 @@ def main():
         notice("리뷰할 코드 변경이 없어 건너뜁니다")
         return
 
-    api_key = os.environ.get("OPENROUTER_API_KEY")
-    if not api_key:
-        notice("OPENROUTER_API_KEY 시크릿이 없어 AI 리뷰를 건너뜁니다")
+    openrouter_key = os.environ.get("OPENROUTER_API_KEY")
+    gemini_key = os.environ.get("GEMINI_API_KEY")
+    if not openrouter_key and not gemini_key:
+        notice("OPENROUTER_API_KEY와 GEMINI_API_KEY 시크릿이 모두 없어 AI 리뷰를 건너뜁니다")
         return
 
     try:
@@ -403,7 +476,7 @@ def main():
         return
 
     try:
-        results = call_models(api_key, models, user_text, system_prompt)
+        results = call_models(openrouter_key, gemini_key, models, user_text, system_prompt)
     except Exception as e:  # 참고용 리뷰라 실패해도 PR을 막지 않는다
         notice(f"AI 리뷰 병렬 실행 실패 (PR에는 영향 없음): {e}")
         return
@@ -452,7 +525,7 @@ def main():
         opened = " open" if index == first_success else ""
         content = (
             limit_review(result["review"]) if "review" in result
-            else f"> OpenRouter 호출 실패: `{result['error']}`"
+            else f"> API 호출 실패: `{result['error']}`"
         )
         reviews.append(f"<details{opened}><summary>{summary}</summary>\n\n{content.strip()}\n\n</details>")
 
@@ -464,7 +537,7 @@ def main():
         "\n\n".join(reviews),
         "---",
         "<sub>참고용 자동 리뷰입니다. 틀릴 수 있으니 확인 후 반영하고, 머지 판단은 사람이 합니다. "
-        "변경분은 OpenRouter와 선택한 모델 제공자들로 전송됩니다. 각 모델의 데이터 처리 정책과 과금 조건을 확인하세요. "
+        "변경분은 OpenRouter와 Google Gemini API의 선택 모델 제공자들로 전송됩니다. 각 서비스의 데이터 처리 정책과 과금 조건을 확인하세요. "
         f"시스템 설명: `{ctx_source}` · 설정: `scripts/ai-review/review.py`</sub>",
     ])
 

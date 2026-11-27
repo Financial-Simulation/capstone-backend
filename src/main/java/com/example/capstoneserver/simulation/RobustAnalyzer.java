@@ -7,7 +7,6 @@ import com.example.capstoneserver.simulation.ParamsRepository.Robust;
 import com.example.capstoneserver.simulation.dto.RobustResponse;
 import com.example.capstoneserver.simulation.engine.EngineParams;
 import com.example.capstoneserver.simulation.engine.EngineParams.Inflation;
-import com.example.capstoneserver.simulation.engine.EngineParams.Shock;
 import com.example.capstoneserver.simulation.engine.EngineParams.Spend;
 import com.example.capstoneserver.simulation.engine.EngineParams.Stats;
 import com.example.capstoneserver.simulation.engine.EngineParams.Unemp;
@@ -125,11 +124,10 @@ class RobustAnalyzer {
 
         Unemp unemp = new Unemp(s.unemp().ageEdges(), uByAge, c.exitByStructure().get(structure), involShare,
                 s.unemp().contractRatio(), s.unemp().contractSharePop(), scar);
-        double[][] base = s.shock().amounts();
-        double[][] amounts = {{base[0][0] * amount, base[0][1]}, {base[1][0] * amount, base[1][1]}};
         Spend spend = new Spend(raiseShare, s.spend().unempCutUi(), s.spend().unempCutNoui());
 
-        return new Stats(inflation, wage, unemp, s.ui(), spend, new Shock(shockProb, amounts), s.overdraft(), s.liquid());
+        return new Stats(inflation, wage, unemp, s.ui(), spend, s.shock().scaled(shockProb, amount),
+                s.overdraft(), s.liquid());
     }
 
     /** 확률표 키는 0.67, 1.0, 1.5 표기를 쓴다 */

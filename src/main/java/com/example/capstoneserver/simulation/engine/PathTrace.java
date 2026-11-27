@@ -34,6 +34,8 @@ public record PathTrace(int path, List<Month> months) {
      * @param income    실제로 들어온 돈 (실직이면 실업급여 또는 0)
      * @param living    생활비 (고정 + 변동, 물가 반영, 실직 중 감소)
      * @param shock     급한 지출
+     * @param shockType 급한 지출 유형 코드
+     * @param shockLabel 급한 지출 유형 이름
      * @param planned   예정된 일 비용 (입력의 예정 이벤트: 일시금 · 이사 비용 · 보증금)
      * @param loan      대출 상환
      * @param refund    연말정산 환급 (2월)
@@ -48,10 +50,22 @@ public record PathTrace(int path, List<Month> months) {
                         double refund, double subsidy, double received, double taxPaid,
                         double putPolicy, double putHousing, double putPension, double putGeneral, double putInvest,
                         double cash, double overdraft, double policy, double housing, double pension,
-                        double general, double invest, double deposit, double total, double inflation) {
+                        double general, double invest, double deposit, double total, double inflation,
+                        String shockType, String shockLabel) {
 
         public boolean has(int event) {
             return (events & event) != 0;
+        }
+
+        public Month(int t, boolean employed, boolean unemploymentBenefit, int events,
+                     double salary, double income, double living, double shock, double planned, double loan,
+                     double refund, double subsidy, double received, double taxPaid,
+                     double putPolicy, double putHousing, double putPension, double putGeneral, double putInvest,
+                     double cash, double overdraft, double policy, double housing, double pension,
+                     double general, double invest, double deposit, double total, double inflation) {
+            this(t, employed, unemploymentBenefit, events, salary, income, living, shock, planned, loan,
+                    refund, subsidy, received, taxPaid, putPolicy, putHousing, putPension, putGeneral, putInvest,
+                    cash, overdraft, policy, housing, pension, general, invest, deposit, total, inflation, null, null);
         }
     }
 

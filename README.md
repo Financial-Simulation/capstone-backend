@@ -105,7 +105,7 @@ infra/ scripts/   AWS 권한, 배포·AI 리뷰 스크립트
 ```mermaid
 flowchart LR
     PR[Pull Request] --> CI[CI<br/>테스트·golden 대조]
-    PR --> AI[AI Review<br/>OpenRouter 다중 모델]
+    PR --> AI[AI Review<br/>OpenRouter + Gemini]
     CI -->|main 통과| DEP[Deploy<br/>ECR → EC2]
     DEP --> PERF[Perf<br/>k6 매일 측정 → Discord]
 ```
@@ -122,13 +122,14 @@ flowchart LR
 
 <br>
 
-PR 변경분을 OpenRouter로 보내 최대 4개 모델이 동시에 리뷰한다. 결과는 소요 시간과 함께
+PR 변경분을 OpenRouter의 최대 4개 모델과 Google Gemini API에 동시에 보낸다. 결과는 소요 시간과 함께
 모델별 접기 섹션이 있는 댓글 하나로 게시하며, 실패한 모델이 있어도 성공한 결과는 남는다.
 
-1. **Settings → Secrets and variables → Actions**에서 `OPENROUTER_API_KEY` 시크릿 등록
+1. **Settings → Secrets and variables → Actions**에서 `OPENROUTER_API_KEY`, `GEMINI_API_KEY` 시크릿 등록
 2. 같은 위치의 Variables에 `AI_REVIEW_MODELS` 등록 (JSON 배열 또는 쉼표 구분)<br>
    예: `["openai/gpt-4.1-mini","anthropic/claude-3.7-sonnet"]`
 3. 등록하지 않으면 `AI_REVIEW_MODEL` 값 또는 `nvidia/nemotron-3.5-lightning:free` 한 모델만 사용
+4. `GEMINI_MODEL`로 직접 호출할 Gemini 모델을 선택할 수 있다 (기본값 `gemini-3.6-flash`)
 
 > [!WARNING]
 > 모델 종류와 호출 횟수에 따라 비용이 생길 수 있다. 모델별 데이터 처리 정책을 확인하고,

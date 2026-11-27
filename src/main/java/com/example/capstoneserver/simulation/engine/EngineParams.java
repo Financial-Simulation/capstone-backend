@@ -2,6 +2,7 @@ package com.example.capstoneserver.simulation.engine;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
 
 /**
  * 엔진이 쓰는 값 (구현 명세서 3장, 세금 모듈 명세 6장). params.json의 키 이름을 그대로 읽는다.
@@ -63,8 +64,34 @@ public record EngineParams(Stats stats, Policy policy, General general, Housing 
             @JsonProperty("unemp_cut_ui") double unempCutUi,
             @JsonProperty("unemp_cut_noui") double unempCutNoui) {}
 
-    /** amounts: [금액, 비율] 목록 */
-    public record Shock(@JsonProperty("prob_m") double probM, double[][] amounts) {}
+    /**
+     * 급한 지출. categories가 없던 기존 설정은 amounts의 이산 분포를 사용한다.
+     * category별 확률은 월 확률이다. 금액 분포는 기존 시뮬레이션 결과를 유지한다.
+     */
+    public record Shock(@JsonProperty("prob_m") double probM, double[][] amounts, List<Category> categories) {
+
+        public Shock(double probM, double[][] amounts) {
+            this(probM, amounts, List.of());
+        }
+
+        public Shock scaled(double probability, double amountScale) {
+            double[][] scaledAmounts = new double[amounts.length][2];
+            for (int i = 0; i < amounts.length; i++) {
+                scaledAmounts[i] = new double[] {amounts[i][0] * amountScale, amounts[i][1]};
+            }
+            if (categories == null || categories.isEmpty()) {
+                return new Shock(probability, scaledAmounts);
+            }
+            double total = categories.stream().mapToDouble(Category::probM).sum();
+            double scale = total > 0 ? probability / total : 0;
+            List<Category> scaledCategories = categories.stream()
+                    .map(c -> new Category(c.type(), c.label(), c.probM() * scale))
+                    .toList();
+            return new Shock(probability, scaledAmounts, scaledCategories);
+        }
+
+        public record Category(String type, String label, @JsonProperty("prob_m") double probM) {}
+    }
 
     public record Rate(@JsonProperty("annual_rate") double annualRate) {}
 

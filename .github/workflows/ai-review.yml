@@ -1,9 +1,11 @@
 name: AI Review
 
-# PR 변경분을 OpenRouter의 여러 모델이 병렬로 리뷰해 비교 댓글 하나로 남긴다. 참고용이며 PR을 막지 않는다.
+# PR 변경분을 OpenRouter의 여러 모델과 Google Gemini가 병렬로 리뷰해 비교 댓글 하나로 남긴다. 참고용이며 PR을 막지 않는다.
 # 필요한 설정 (Settings → Secrets and variables → Actions)
 #   Secrets:   OPENROUTER_API_KEY  OpenRouter에서 만든 키
-#   Variables: AI_REVIEW_MODELS    (선택) JSON 배열 또는 쉼표 구분 모델 목록, 최대 4개
+#              GEMINI_API_KEY      Google AI Studio에서 만든 키
+#   Variables: AI_REVIEW_MODELS    (선택) JSON 배열 또는 쉼표 구분 OpenRouter 모델 목록, 최대 4개
+#              GEMINI_MODEL        (선택) 기본 gemini-3.6-flash
 #              예: ["openai/gpt-4.1-mini","anthropic/claude-3.7-sonnet"]
 #              AI_REVIEW_MODEL도 기존 단일 모델 설정으로 계속 사용할 수 있다
 on:
@@ -30,12 +32,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Review with OpenRouter
+      - name: Review with OpenRouter and Gemini
         continue-on-error: true   # 리뷰가 실패해도 PR 체크는 초록불
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           AI_REVIEW_MODELS: ${{ vars.AI_REVIEW_MODELS }}
           AI_REVIEW_MODEL: ${{ vars.AI_REVIEW_MODEL }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+          GEMINI_THINKING_LEVEL: ${{ vars.GEMINI_THINKING_LEVEL || 'low' }}
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
